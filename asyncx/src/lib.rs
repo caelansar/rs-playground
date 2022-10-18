@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use tokio::time::sleep;
 
+#[allow(dead_code)]
 async fn request() -> String {
     sleep(Duration::from_secs(2)).await;
     "content".to_string()
@@ -33,11 +34,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn spawn_should_works() {
+        for _ in 0..10 {
+            tokio::spawn(async move {
+                let resp = request().await;
+                println!("resp: {:?}", resp);
+            });
+        }
+        sleep(Duration::from_secs(3)).await;
+    }
+
+    #[tokio::test]
     async fn select_sould_works() {
         tokio::select! {
             res = run_server() => {
                 if let Err(err) = res {
-                    println!("err!");
+                    println!("err {}", err.to_string());
                 }
             }
             _ = sleep(Duration::from_secs(10)) => {
