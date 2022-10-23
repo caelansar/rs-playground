@@ -55,8 +55,8 @@ mod tests {
             for event in events.iter() {
                 // We can use the token we previously provided to `register` to
                 // determine for which socket the event is.
-                match event.token() {
-                    token if (0..10usize).into_iter().contains(&token.0) => {
+                match event.token().0 {
+                    0..=9 => {
                         let token = event.token();
                         if event.is_writable() {
                             // If socket has not been written before
