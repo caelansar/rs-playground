@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use mio::net::TcpStream;
+    use bytes::BufMut;
+    use mio::net::{TcpListener, TcpStream};
     use mio::{Events, Interest, Poll, Token};
     use std::collections::HashMap;
     use std::error::Error;
@@ -18,11 +19,8 @@ mod tests {
             let mut client = TcpStream::connect(addr)?;
 
             // Register the socket.
-            poll.registry().register(
-                &mut client,
-                Token(i),
-                Interest::READABLE.add(Interest::WRITABLE),
-            )?;
+            poll.registry()
+                .register(&mut client, Token(i), Interest::WRITABLE)?;
 
             sockets.insert(Token(i), client);
         }
@@ -30,9 +28,99 @@ mod tests {
     }
 
     #[test]
-    fn mio_should_works() -> Result<(), Box<dyn Error>> {
+    fn mio_server_should_works() -> Result<(), Box<dyn Error>> {
+        let addr = "0.0.0.0:5001".parse()?;
+        let mut listener = TcpListener::bind(addr).unwrap();
+
+        // Create a poll instance.
+        let mut poll = Poll::new()?;
+        // Create storage for events.
+        let mut events = Events::with_capacity(128);
+
+        poll.registry()
+            .register(&mut listener, Token(0), Interest::READABLE)?;
+
+        let mut counter: usize = 0;
         let mut sockets: HashMap<Token, TcpStream> = HashMap::new();
-        let mut w: HashMap<Token, bool> = HashMap::new();
+        let mut request: HashMap<Token, Vec<u8>> = HashMap::new();
+
+        // Start an event loop.
+        loop {
+            poll.poll(&mut events, None)?;
+
+            for event in &events {
+                match event.token() {
+                    Token(0) => {
+                        loop {
+                            match listener.accept() {
+                                Ok((mut socket, address)) => {
+                                    println!("Got connection from {}", address);
+
+                                    counter += 1;
+                                    let token = Token(counter);
+
+                                    // Register for readable events
+                                    poll.registry().register(
+                                        &mut socket,
+                                        token,
+                                        Interest::READABLE,
+                                    )?;
+                                    sockets.insert(token, socket);
+                                }
+                                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                                Err(e) => panic!("Unexpected error: {}", e),
+                            }
+                        }
+                    }
+                    token if event.is_readable() => {
+                        let mut buffer = [0 as u8; 1024];
+                        let mut req = vec![];
+                        loop {
+                            let read = sockets.get_mut(&token).unwrap().read(&mut buffer);
+                            match read {
+                                Ok(0) => {
+                                    // Disconnect
+                                    poll.registry()
+                                        .deregister(sockets.get_mut(&token).unwrap())?;
+                                    sockets.remove(&token);
+                                    break;
+                                }
+                                Ok(len) => {
+                                    req.put(&buffer[0..len]);
+                                    println!("Read {} bytes for token {}", len, token.0);
+                                    break;
+                                }
+                                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                                Err(e) => panic!("Unexpected error: {}", e),
+                            }
+                        }
+                        if sockets.get_mut(&token).is_some() {
+                            poll.registry().reregister(
+                                sockets.get_mut(&token).unwrap(),
+                                token,
+                                Interest::WRITABLE,
+                            )?;
+                            request.insert(token, req);
+                        }
+                    }
+                    token if event.is_writable() => {
+                        let req = request.get(&token).unwrap();
+                        let socket = sockets.get_mut(&token).unwrap();
+                        socket.write_all(req.as_slice()).unwrap();
+                        request.remove(&token);
+                        poll.registry()
+                            .reregister(socket, token, Interest::READABLE)?;
+                    }
+                    // We don't expect any events with tokens other than those we provided.
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mio_client_should_works() -> Result<(), Box<dyn Error>> {
+        let mut sockets: HashMap<Token, TcpStream> = HashMap::new();
         // Create a poll instance.
         let mut poll = Poll::new()?;
         // Create storage for events.
@@ -60,15 +148,13 @@ mod tests {
                         let token = event.token();
                         if event.is_writable() {
                             // If socket has not been written before
-                            if *(w.entry(token).or_insert(false)) {
-                                println!("Already write");
-                            } else {
-                                let req = "GET / HTTP/1.1\r\nHost: 127.0.0.1:5000\r\n\r\n";
-                                println!("Write data for token {}", token.0);
-                                // Write to the socket without blocking.
-                                sockets.get_mut(&token).unwrap().write_all(req.as_bytes())?;
-                                w.insert(token, true);
-                            }
+                            let req = "GET / HTTP/1.1\r\nHost: 127.0.0.1:5000\r\n\r\n";
+                            println!("Write data for token {}", token.0);
+                            // Write to the socket without blocking.
+                            let socket = sockets.get_mut(&token).unwrap();
+                            socket.write_all(req.as_bytes())?;
+                            poll.registry()
+                                .reregister(socket, token, Interest::READABLE)?;
                         }
 
                         if event.is_readable() {
@@ -76,12 +162,11 @@ mod tests {
                             let read = sockets.get_mut(&token).unwrap().read(&mut buffer);
                             match read {
                                 Ok(len) => {
-                                    // Now do something with &buffer[0..len]
                                     println!(
                                         "Read {} bytes for token {}, bytes: {:?}",
                                         len,
                                         token.0,
-                                        &buffer[0..len]
+                                        String::from_utf8_lossy(&buffer[0..len])
                                     );
                                 }
                                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
