@@ -5,4 +5,5 @@ members = [
     "asyncx",
     "macrox",
     "miox",
+    "list",
 ]
