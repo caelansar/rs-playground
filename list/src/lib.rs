@@ -92,7 +92,7 @@ pub struct Iter<'a, T> {
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
-        // self.next.map it is fine because &Node<T> is `Copy`
+        // self.next.map is fine because &Node<T> is `Copy`
         // and Option<&Node<T>> is also `Copy`
         self.next.map(|x| {
             self.next = x.next.as_deref();
@@ -109,7 +109,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // &mut isn't `Copy`, instead, we should `Take` the ownership to get it.
+        // &mut isn't `Copy`, so we should `Take` the ownership to get it
         self.next.take().map(|x| {
             self.next = x.next.as_deref_mut();
             &mut x.elem

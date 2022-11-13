@@ -6,4 +6,5 @@ members = [
     "macrox",
     "miox",
     "list",
+    "grpc",
 ]
