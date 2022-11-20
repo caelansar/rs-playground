@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package abi;
+
+message ImageSpec { repeated Spec specs = 1; }
+
+message Resize {
+  uint32 width = 1;
+  uint32 height = 2;
+
+  enum ResizeType {
+    NORMAL = 0;
+    SEAM_CARVE = 1;
+  }
+
+  ResizeType rtype = 3;
+
+  enum SampleFilter {
+    UNDEFINED = 0;
+    NEAREST = 1;
+    TRIANGLE = 2;
+    CATMULL_ROM = 3;
+    GAUSSIAN = 4;
+    LANCZOS3 = 5;
+  }
+
+  SampleFilter filter = 4;
+}
+
+message Watermark {
+  uint32 x = 1;
+  uint32 y = 2;
+}
+
+message Spec {
+  oneof data {
+    Resize resize = 1;
+    Watermark watermark = 2;
+  }
+}
