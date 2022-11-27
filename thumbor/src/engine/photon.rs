@@ -4,6 +4,7 @@ use anyhow::Result;
 use bytes::Bytes;
 use image::{DynamicImage, ImageBuffer, ImageOutputFormat};
 use lazy_static::lazy_static;
+use photon_rs::filters;
 use photon_rs::{multiple, native::open_image_from_bytes, transform, PhotonImage};
 use std::io::Cursor;
 use std::ops::{Deref, DerefMut};
@@ -52,6 +53,9 @@ impl Engine for Photon {
             match spec.data {
                 Some(spec::Data::Resize(ref v)) => self.transform(v),
                 Some(spec::Data::Watermark(ref v)) => self.transform(v),
+                Some(spec::Data::Fliph(ref v)) => self.transform(v),
+                Some(spec::Data::Flipv(ref v)) => self.transform(v),
+                Some(spec::Data::Filter(ref v)) => self.transform(v),
                 _ => unreachable!(),
             }
         }
@@ -80,6 +84,24 @@ impl SpecTransformer<&Resize> for Photon {
 impl SpecTransformer<&Watermark> for Photon {
     fn transform(&mut self, op: &Watermark) {
         multiple::watermark(self, &WATERMARK, op.x, op.y);
+    }
+}
+
+impl SpecTransformer<&Fliph> for Photon {
+    fn transform(&mut self, _op: &Fliph) {
+        transform::fliph(self)
+    }
+}
+
+impl SpecTransformer<&Flipv> for Photon {
+    fn transform(&mut self, _op: &Flipv) {
+        transform::flipv(self)
+    }
+}
+
+impl SpecTransformer<&Filter> for Photon {
+    fn transform(&mut self, op: &Filter) {
+        filters::filter(self, op.filter().as_str_name().to_lowercase().as_str())
     }
 }
 

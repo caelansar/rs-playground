@@ -9,19 +9,19 @@ message Resize {
   uint32 height = 2;
 
   enum ResizeType {
-    NORMAL = 0;
+    NORMAL     = 0;
     SEAM_CARVE = 1;
   }
 
   ResizeType rtype = 3;
 
   enum SampleFilter {
-    UNDEFINED = 0;
-    NEAREST = 1;
-    TRIANGLE = 2;
+    UNKNOWN     = 0;
+    NEAREST     = 1;
+    TRIANGLE    = 2;
     CATMULL_ROM = 3;
-    GAUSSIAN = 4;
-    LANCZOS3 = 5;
+    GAUSSIAN    = 4;
+    LANCZOS3    = 5;
   }
 
   SampleFilter filter = 4;
@@ -32,9 +32,28 @@ message Watermark {
   uint32 y = 2;
 }
 
+message Fliph {
+}
+
+message Flipv {
+}
+
+message Filter {
+    enum Filter {
+        UNKNOWN   = 0;
+        FLAGBLUE  = 1;
+        LIQUID    = 2;
+        TWENTIES  = 3;
+    }
+    Filter filter = 1;
+}
+
 message Spec {
   oneof data {
-    Resize resize = 1;
+    Resize resize       = 1;
     Watermark watermark = 2;
+    Fliph fliph         = 3;
+    Flipv flipv         = 4;
+    Filter filter       = 5;
   }
 }

@@ -30,7 +30,7 @@ impl TryFrom<&str> for ImageSpec {
 impl From<resize::SampleFilter> for SamplingFilter {
     fn from(v: resize::SampleFilter) -> Self {
         match v {
-            resize::SampleFilter::Undefined => SamplingFilter::Nearest,
+            resize::SampleFilter::Unknown => SamplingFilter::Nearest,
             resize::SampleFilter::Nearest => SamplingFilter::Nearest,
             resize::SampleFilter::Triangle => SamplingFilter::Triangle,
             resize::SampleFilter::CatmullRom => SamplingFilter::CatmullRom,
@@ -47,7 +47,7 @@ impl Spec {
                 width,
                 height,
                 rtype: resize::ResizeType::SeamCarve as i32,
-                filter: resize::SampleFilter::Undefined as i32,
+                filter: resize::SampleFilter::Unknown as i32,
             })),
         }
     }
@@ -68,6 +68,28 @@ impl Spec {
             data: Some(spec::Data::Watermark(Watermark { x, y })),
         }
     }
+
+    pub fn new_flipv() -> Self {
+        Self {
+            data: Some(spec::Data::Flipv(Flipv {})),
+        }
+    }
+    pub fn new_fliph() -> Self {
+        Self {
+            data: Some(spec::Data::Fliph(Fliph {})),
+        }
+    }
+    pub fn new_filter(f: filter::Filter) -> Self {
+        let mut filter = f;
+        if filter == filter::Filter::Unknown {
+            filter = filter::Filter::Twenties;
+        }
+        Self {
+            data: Some(spec::Data::Filter(Filter {
+                filter: filter.into(),
+            })),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -79,9 +101,14 @@ mod tests {
     fn encoded_spec_could_be_decoded() {
         let spec1 = Spec::new_resize(960, 720, resize::SampleFilter::CatmullRom);
         let spec2 = Spec::new_watermark(0, 0);
-        let image_spec = ImageSpec::new(vec![spec1, spec2]);
+        let spec3 = Spec::new_fliph();
+        let spec4 = Spec::new_filter(filter::Filter::Twenties);
+        let image_spec = ImageSpec::new(vec![spec1, spec3, spec4, spec2]);
         let s: String = image_spec.borrow().into();
         println!("spec string: {}", s);
         assert_eq!(image_spec, s.as_str().try_into().unwrap());
+
+        let image_spec2 = ImageSpec::try_from(s.as_str()).unwrap();
+        assert_eq!(image_spec, image_spec2);
     }
 }

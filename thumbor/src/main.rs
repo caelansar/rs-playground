@@ -116,5 +116,6 @@ async fn retrieve_image(url: &str, cache: Cache) -> Result<Bytes> {
             data
         }
     };
+    info!("get data success");
     Ok(data)
 }
