@@ -8,4 +8,6 @@ members = [
     "list",
     "grpc",
     "thumbor",
+    "allocator",
+    "pointer",
 ]
