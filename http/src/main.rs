@@ -1,13 +1,15 @@
+mod error;
 mod session;
 
 use axum::{
     extract::Query,
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use error::AppError;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use session::get_session_id;
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr};
 
@@ -41,7 +43,12 @@ async fn create_user(
     // this argument tells axum to parse the request body
     // as JSON into a `CreateUser` type
     Json(payload): Json<CreateUser>,
-) -> impl IntoResponse {
+) -> Result<(StatusCode, Json<User>), error::AppError> {
+    if payload.username.len() < 4 {
+        return Err(AppError::new("create user")
+            .with_status(StatusCode::BAD_REQUEST)
+            .with_details(Value::String("username too short".to_string())));
+    }
     // insert your application logic here
     let user = User {
         id: 1,
@@ -50,7 +57,7 @@ async fn create_user(
 
     // this will be converted into a JSON response
     // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
+    Ok((StatusCode::CREATED, Json(user)))
 }
 
 async fn get_users(
