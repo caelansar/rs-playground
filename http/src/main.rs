@@ -101,3 +101,74 @@ struct User {
     id: u64,
     username: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::Body, http::Request, Router};
+    use serde_json::{json, Value};
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn test_request() {
+        let app = Router::new()
+            .route("/users", post(create_user))
+            .route("/users", get(get_users));
+
+        let app1 = app.clone();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/users")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let (parts, body) = resp.into_parts();
+        let body = hyper::body::to_bytes(body).await.unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parts.status, StatusCode::OK);
+        assert_eq!(
+            body,
+            json!([
+               {
+                "id": 1,
+                "username": "a"
+               },
+               {
+                "id": 2,
+                "username": "b"
+               }
+            ])
+        );
+
+        let resp = app1
+            .oneshot(
+                Request::builder()
+                    .uri("/users")
+                    .method("POST")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        serde_json::to_string(&json!({"username": "a"})).unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let (parts, body) = resp.into_parts();
+        let body = hyper::body::to_bytes(body).await.unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parts.status, StatusCode::BAD_REQUEST);
+        assert_eq!(
+            body,
+            json!({
+                "error":"create user",
+                "error_details":"username too short"
+            })
+        );
+    }
+}
