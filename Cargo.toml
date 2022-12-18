@@ -11,4 +11,5 @@ members = [
     "allocator",
     "pointer",
     "http",
+    "trait_object",
 ]
