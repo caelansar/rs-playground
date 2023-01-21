@@ -1,5 +1,6 @@
 mod cell;
 mod rc;
+mod refcell;
 mod string;
 
 #[cfg(test)]
@@ -7,7 +8,9 @@ mod tests {
 
     use crate::cell::Cell;
     use crate::rc::Rc as Rc1;
+    use crate::refcell::{RefCell, RefMut};
     use crate::string::*;
+    use std::collections::HashMap;
     use std::rc::Rc;
 
     #[test]
@@ -63,5 +66,37 @@ mod tests {
         // which can always be mutated
         my_struct.special_field.set(new_value);
         assert_eq!(my_struct.special_field.get(), new_value);
+    }
+
+    #[test]
+    fn refcell_should_work() {
+        let shared_map: Rc1<RefCell<_>> = Rc1::new(RefCell::new(HashMap::new()));
+        // Create a new block to limit the scope of the dynamic borrow
+        {
+            let mut map: RefMut<_> = shared_map.borrow_mut().unwrap();
+            map.insert("africa", 92388);
+            map.insert("kyoto", 11837);
+            map.insert("piccadilly", 11826);
+            map.insert("marbles", 38);
+        }
+
+        // Note that if we had not let the previous borrow of the cache fall out
+        // of scope then the subsequent borrow would cause a dynamic thread panic.
+        // This is the major hazard of using `RefCell`.
+        let total: i32 = shared_map.borrow().unwrap().values().sum();
+        assert_eq!(116089, total);
+    }
+
+    #[test]
+    fn no_refcell_should_work() {
+        let mut shared_map = HashMap::new();
+
+        shared_map.insert("africa", 92388);
+        shared_map.insert("kyoto", 11837);
+        shared_map.insert("piccadilly", 11826);
+        shared_map.insert("marbles", 38);
+
+        let total: i32 = shared_map.values().sum();
+        assert_eq!(116089, total);
     }
 }
