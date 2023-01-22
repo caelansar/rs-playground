@@ -52,10 +52,86 @@ mod tests {
                     println!("err {}", err.to_string());
                 }
             }
-            _ = sleep(Duration::from_secs(10)) => {
+            _ = sleep(Duration::from_secs(5)) => {
                 println!("timeout");
             }
         }
+    }
+
+    #[derive(Debug)]
+    struct SelfReference {
+        name: String,
+        name_ptr: *const String,
+    }
+
+    impl SelfReference {
+        fn new(name: String) -> Self {
+            SelfReference {
+                name,
+                name_ptr: std::ptr::null(),
+            }
+        }
+
+        fn init(&mut self) {
+            self.name_ptr = &self.name as *const String
+        }
+
+        fn print_name(&self) {
+            print!(
+                "struct {:p}\nname: {:p} name_ptr: {:p}\nname_val: {}, name_ref_val: {}\n",
+                self,
+                &self.name,
+                self.name_ptr,
+                self.name,
+                unsafe { &*self.name_ptr }
+            )
+        }
+    }
+
+    #[test]
+    fn test_self_reference() {
+        let data = move_ptr();
+        println!("data: {:?}", data);
+
+        // ERROR
+        // data.print_name();
+        println!("memory swap");
+        mem_swap();
+    }
+
+    fn move_ptr() -> SelfReference {
+        let mut data = SelfReference::new("xx".to_string());
+        data.init();
+
+        data.print_name();
+
+        // shadow
+        let data = move_data(data);
+
+        // the addr which name_ptr references is changed after move
+        // but addr is still valid here, after this function return
+        // it will be drop
+        data.print_name();
+        data
+    }
+
+    fn mem_swap() {
+        let mut data1 = SelfReference::new("hello".to_string());
+        data1.init();
+
+        let mut data2 = SelfReference::new("world".to_string());
+        data2.init();
+
+        data1.print_name();
+        data2.print_name();
+
+        std::mem::swap(&mut data1, &mut data2);
+        data1.print_name();
+        data2.print_name();
+    }
+
+    fn move_data(data: SelfReference) -> SelfReference {
+        data
     }
 
     async fn run_server() -> Result<()> {
@@ -68,7 +144,7 @@ mod tests {
             tokio::spawn(async move {
                 let framed = Framed::new(stream, LinesCodec::new());
                 let (mut w, mut r) = framed.split();
-                for line in r.next().await {
+                while let Some(line) = r.next().await {
                     w.send(format!("got : {}", line?)).await.unwrap();
                 }
                 Ok::<_, anyhow::Error>(())
