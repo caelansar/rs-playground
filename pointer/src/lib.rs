@@ -11,7 +11,7 @@ mod tests {
     use crate::refcell::{RefCell, RefMut};
     use crate::string::*;
     use std::collections::HashMap;
-    use std::rc::Rc;
+    use std::rc::{Rc, Weak};
 
     #[test]
     fn smart_string_should_work() {
@@ -117,5 +117,45 @@ mod tests {
 
         let total: i32 = shared_map.values().sum();
         assert_eq!(116089, total);
+    }
+
+    struct A {
+        reference: Rc<B>,
+    }
+
+    impl A {
+        fn fn_a(&self) -> usize {
+            1
+        }
+    }
+
+    struct B {
+        reference: RefCell1<Weak<A>>,
+    }
+
+    impl B {
+        fn fn_b(&self) -> usize {
+            2
+        }
+    }
+
+    use std::cell::RefCell as RefCell1;
+
+    #[test]
+    fn circular_reference_should_work() {
+        let b = Rc::new(B {
+            reference: RefCell1::new(Weak::new()),
+        });
+
+        let a = A {
+            reference: b.clone(),
+        };
+
+        let rc_a = Rc::new(a);
+
+        *b.reference.borrow_mut() = Rc::downgrade(&rc_a);
+
+        assert_eq!(2, b.fn_b());
+        assert_eq!(1, b.reference.borrow().upgrade().unwrap().fn_a());
     }
 }
