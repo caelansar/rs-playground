@@ -42,7 +42,26 @@ mod tests {
         let rc1 = rc.clone();
         assert_eq!(2, *rc1 + 1);
         assert_eq!(1, *rc);
+        assert_eq!(2, Rc::strong_count(&rc));
         drop(rc1);
+        assert_eq!(1, Rc::strong_count(&rc));
+    }
+
+    #[test]
+    fn weak_ptr_should_work() {
+        let rc = Rc::new(1);
+        let rc1 = rc.clone();
+        assert_eq!(2, Rc::strong_count(&rc));
+        assert_eq!(0, Rc::weak_count(&rc));
+        drop(rc1);
+        assert_eq!(1, Rc::strong_count(&rc));
+        assert_eq!(0, Rc::weak_count(&rc));
+        let rc_weak = Rc::downgrade(&rc);
+        assert_eq!(1, Rc::strong_count(&rc));
+        assert_eq!(1, Rc::weak_count(&rc));
+        assert_eq!(Some(Rc::new(1)), rc_weak.upgrade());
+        drop(rc);
+        assert_eq!(None, rc_weak.upgrade());
     }
 
     struct SomeStruct {
