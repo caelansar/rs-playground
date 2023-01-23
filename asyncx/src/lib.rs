@@ -1,3 +1,5 @@
+#![feature(negative_impls)]
+
 use std::time::Duration;
 
 use tokio::time::sleep;
@@ -13,9 +15,24 @@ mod tests {
     use crate::request;
     use anyhow::{self, Result};
     use futures::{SinkExt, StreamExt};
-    use std::time::Duration;
-    use tokio::{net::TcpListener, time::sleep};
+    use std::{pin::Pin, time::Duration};
+    use tokio::{net::TcpListener, sync::mpsc::channel, time::sleep};
+    use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{Framed, LinesCodec};
+
+    #[tokio::test]
+    async fn mpsc_should_works() {
+        let (tx, rx) = channel(10);
+
+        tx.send(1).await.unwrap();
+        tx.send(100).await.unwrap();
+        drop(tx);
+
+        let mut stream = ReceiverStream::new(rx);
+        while let Some(data) = stream.next().await {
+            println!("recv stream: {}", data)
+        }
+    }
 
     #[tokio::test]
     async fn read_content_should_works() {
@@ -76,6 +93,13 @@ mod tests {
             self.name_ptr = &self.name as *const String
         }
 
+        fn init_pinned(self: Pin<&mut Self>) {
+            let name_ptr = &self.name as *const String;
+            // SAFETY: won't move data since SelfReference is !Unpin
+            let s = unsafe { self.get_unchecked_mut() };
+            s.name_ptr = name_ptr;
+        }
+
         fn print_name(&self) {
             print!(
                 "struct {:p}\nname: {:p} name_ptr: {:p}\nname_val: {}, name_ref_val: {}\n",
@@ -88,6 +112,8 @@ mod tests {
         }
     }
 
+    impl !Unpin for SelfReference {}
+
     #[test]
     fn test_self_reference() {
         let data = move_ptr();
@@ -97,6 +123,11 @@ mod tests {
         // data.print_name();
         println!("memory swap");
         mem_swap();
+    }
+
+    #[test]
+    fn test_pinned_self_reference() {
+        move_ptr_pinned();
     }
 
     fn move_ptr() -> SelfReference {
@@ -115,6 +146,19 @@ mod tests {
         data
     }
 
+    fn move_ptr_pinned() {
+        let mut data = SelfReference::new("aa".to_string());
+        let mut data = unsafe { Pin::new_unchecked(&mut data) };
+
+        SelfReference::init_pinned(data.as_mut());
+
+        data.as_ref().print_name();
+
+        let _ = move_pinned(data.as_mut());
+
+        data.as_ref().print_name();
+    }
+
     fn mem_swap() {
         let mut data1 = SelfReference::new("hello".to_string());
         data1.init();
@@ -122,12 +166,19 @@ mod tests {
         let mut data2 = SelfReference::new("world".to_string());
         data2.init();
 
+        println!("before swap");
         data1.print_name();
         data2.print_name();
 
         std::mem::swap(&mut data1, &mut data2);
+
+        println!("after swap");
         data1.print_name();
         data2.print_name();
+    }
+
+    fn move_pinned(data: Pin<&mut SelfReference>) -> Pin<&mut SelfReference> {
+        data
     }
 
     fn move_data(data: SelfReference) -> SelfReference {
