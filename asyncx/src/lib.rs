@@ -1,5 +1,7 @@
 #![feature(negative_impls)]
 
+mod time_decorator;
+
 use std::time::Duration;
 
 use tokio::time::sleep;
@@ -12,13 +14,24 @@ async fn request() -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::request;
+    use crate::{request, time_decorator};
     use anyhow::{self, Result};
     use futures::{SinkExt, StreamExt};
     use std::{pin::Pin, time::Duration};
     use tokio::{net::TcpListener, sync::mpsc::channel, time::sleep};
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{Framed, LinesCodec};
+
+    #[tokio::test]
+    async fn time_decorator_should_work() {
+        let task = request();
+        let td = time_decorator::TimeDecorator::new(task);
+
+        let (data, elapsed) = td.await;
+
+        assert_eq!("content", data);
+        assert!(elapsed >= Duration::from_secs(2));
+    }
 
     #[tokio::test]
     async fn mpsc_should_works() {
