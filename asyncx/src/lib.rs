@@ -1,5 +1,7 @@
 #![feature(negative_impls)]
+#![feature(string_leak)]
 
+mod cancel_decorator;
 mod time_decorator;
 
 use std::time::Duration;
@@ -14,11 +16,15 @@ async fn request() -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{request, time_decorator};
+    use crate::{cancel_decorator::spawn, request, time_decorator};
     use anyhow::{self, Result};
     use futures::{SinkExt, StreamExt};
-    use std::{pin::Pin, time::Duration};
-    use tokio::{net::TcpListener, sync::mpsc::channel, time::sleep};
+    use std::{cell::RefCell, pin::Pin, sync::Arc, time::Duration};
+    use tokio::{
+        net::TcpListener,
+        sync::{mpsc::channel, Mutex},
+        time::sleep,
+    };
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{Framed, LinesCodec};
 
@@ -31,6 +37,25 @@ mod tests {
 
         assert_eq!("content", data);
         assert!(elapsed >= Duration::from_secs(2));
+    }
+
+    async fn cancelled_task(data: Arc<Mutex<i32>>) {
+        sleep(Duration::from_millis(100)).await;
+        println!("in cancelled_task");
+        let mut lock = data.lock().await;
+        *lock += 1;
+    }
+
+    #[tokio::test]
+    async fn cancel_decorator_should_work() {
+        let data1 = Arc::new(Mutex::new(0));
+        let data2 = data1.clone();
+        let v = spawn(cancelled_task(data1));
+        drop(v);
+        sleep(Duration::from_millis(150)).await;
+
+        let lock = data2.lock().await;
+        assert_eq!(0, *lock);
     }
 
     #[tokio::test]
