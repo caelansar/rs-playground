@@ -12,4 +12,5 @@ members = [
     "pointer",
     "http",
     "trait_object",
+    "gat",
 ]
