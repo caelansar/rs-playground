@@ -1,51 +1,10 @@
-trait Mapper {
-    type Item;
+mod family;
+mod lending_iter;
+mod mapper;
 
-    type Result<U>;
-
-    fn map<F, U>(self, f: F) -> Self::Result<U>
-    where
-        F: FnMut(Self::Item) -> U;
-}
-
-impl<T> Mapper for Option<T> {
-    type Item = T;
-
-    type Result<U> = Option<U>;
-
-    fn map<F, U>(self, f: F) -> Self::Result<U>
-    where
-        F: FnMut(Self::Item) -> U,
-    {
-        Self::map(self, f)
-    }
-}
-
-impl<T, E> Mapper for Result<T, E> {
-    type Item = T;
-
-    type Result<U> = Result<U, E>;
-
-    fn map<F, U>(self, f: F) -> Self::Result<U>
-    where
-        F: FnMut(Self::Item) -> U,
-    {
-        Self::map(self, f)
-    }
-}
-
-impl<T> Mapper for Vec<T> {
-    type Item = T;
-
-    type Result<U> = Vec<U>;
-
-    fn map<F, U>(self, f: F) -> Self::Result<U>
-    where
-        F: FnMut(Self::Item) -> U,
-    {
-        self.into_iter().map(f).collect()
-    }
-}
+use family::*;
+use lending_iter::*;
+use mapper::*;
 
 #[cfg(test)]
 mod tests {
@@ -57,6 +16,10 @@ mod tests {
         F: FnMut(T) -> U,
     {
         mapper.map(f)
+    }
+
+    struct MyStruct<P: PointerFamily> {
+        pointer: P::Pointer<String>,
     }
 
     #[test]
@@ -81,5 +44,32 @@ mod tests {
 
         let v1 = uni_map(v, |x| x + 1);
         assert_eq!(Ok(2), v1)
+    }
+
+    #[test]
+    fn test_family() {
+        fn is_send<T: Send>(_: T) {}
+        let s: MyStruct<RcFamily> = MyStruct {
+            pointer: RcFamily::new("aa".to_string()),
+        };
+        // Rc<String>` cannot be sent between threads safely
+        // is_send(s);
+
+        let s: MyStruct<ArcFamily> = MyStruct {
+            pointer: ArcFamily::new("aa".to_string()),
+        };
+        is_send(s);
+    }
+
+    #[test]
+    fn test_lending_trait() {
+        let mut data = [1, 2, 3, 4, 5, 6];
+        let mut win = WindowsMut::new(&mut data, 0, 3);
+        loop {
+            match win.next() {
+                Some(data) => println!("{:?}", data),
+                None => break,
+            }
+        }
     }
 }
