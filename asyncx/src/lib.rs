@@ -2,6 +2,7 @@
 #![feature(string_leak)]
 
 mod cancel_decorator;
+mod line_stream;
 mod time_decorator;
 
 use std::time::Duration;
@@ -16,17 +17,39 @@ async fn request() -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cancel_decorator::spawn, request, time_decorator};
+    use crate::{
+        cancel_decorator::spawn,
+        line_stream::{line_stream, LineStream},
+        request, time_decorator,
+    };
     use anyhow::{self, Result};
     use futures::{SinkExt, StreamExt};
-    use std::{cell::RefCell, pin::Pin, sync::Arc, time::Duration};
+    use std::{pin::Pin, sync::Arc, time::Duration};
     use tokio::{
+        io::{AsyncBufReadExt, BufReader},
         net::TcpListener,
         sync::{mpsc::channel, Mutex},
         time::sleep,
     };
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{Framed, LinesCodec};
+
+    #[tokio::test]
+    async fn line_stream_should_work() {
+        let reader = BufReader::new(&b"hello\nworld"[..]);
+        let mut ls = LineStream::new(reader);
+
+        let data = ls.next().await.unwrap().unwrap();
+        assert_eq!("hello", data);
+
+        let data = ls.next().await.unwrap().unwrap();
+        assert_eq!("world", data);
+
+        let reader = BufReader::new(&b"hello\nworld"[..]);
+        let ls = line_stream(reader.lines());
+        let output = ls.collect::<Vec<String>>().await;
+        assert_eq!(vec!["hello", "world"], output);
+    }
 
     #[tokio::test]
     async fn time_decorator_should_work() {
