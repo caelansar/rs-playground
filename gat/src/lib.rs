@@ -71,5 +71,9 @@ mod tests {
                 None => break,
             }
         }
+
+        let data = [1, 2, 3, 4, 5, 6];
+        let result = data.into_iter().window_count(3).collect::<Vec<Vec<_>>>();
+        assert_eq!(vec![vec![1, 2, 3], vec![4, 5, 6]], result);
     }
 }
