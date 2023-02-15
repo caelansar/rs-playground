@@ -13,4 +13,5 @@ members = [
     "http",
     "trait_object",
     "gat",
+    "hrtb",
 ]
