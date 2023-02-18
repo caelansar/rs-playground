@@ -15,4 +15,5 @@ members = [
     "gat",
     "hrtb",
     "thread",
+    "ser",
 ]
