@@ -16,4 +16,5 @@ members = [
     "hrtb",
     "thread",
     "ser",
+    "closure",
 ]
