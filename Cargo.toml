@@ -17,4 +17,5 @@ members = [
     "thread",
     "ser",
     "closure",
+    "network",
 ]
