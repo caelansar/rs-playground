@@ -3,12 +3,15 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::time::Duration;
 
 #[cfg(target_os = "macos")]
 mod macos_poll;
-pub use macos_poll::kqueue::{Event, Registrator, Selector, TcpStream};
+use macos_poll::kqueue::KeventList;
+pub use macos_poll::kqueue::{Registrator, Selector, TcpStream};
 
-pub type Events = Vec<Event>;
+#[cfg(target_os = "macos")]
+pub type Events = KeventList;
 pub type Token = usize;
 
 /// `Poll` represents the event queue. The `poll` method will block the current thread
@@ -41,11 +44,8 @@ impl Poll {
     }
 
     /// Polls the event loop. The thread yields to the OS while witing for either
-    /// an event to retur or a timeout to occur. A negative timeout will be treated
-    /// as a timeout of 0.
-    pub fn poll(&mut self, events: &mut Events, timeout_ms: Option<i32>) -> io::Result<usize> {
-        // A negative timout is converted to a 0 timeout
-        let timeout = timeout_ms.map(|n| if n < 0 { 0 } else { n });
+    /// an event to retur or a timeout to occur.
+    pub fn poll(&mut self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
         loop {
             let res = self.registry.selector.select(events, timeout);
             match res {
