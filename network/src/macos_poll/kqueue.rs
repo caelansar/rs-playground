@@ -48,6 +48,12 @@ impl KeventList {
     }
 }
 
+macro_rules! cvt {
+    ($libc_call: expr) => {
+        cvt::cvt(unsafe { $libc_call })
+    };
+}
+
 macro_rules! kevent {
     ($id: expr, $filter: expr, $flags: expr, $data: expr) => {
         libc::kevent {
@@ -85,31 +91,27 @@ impl Registrator {
             let filter = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
             let changes = [kevent!(fd, libc::EVFILT_READ, filter, usize::from(token))];
 
-            unsafe {
-                libc::kevent(
-                    self.kq,
-                    changes.as_ptr(),
-                    changes.len() as Count,
-                    [].as_mut_ptr(),
-                    0,
-                    std::ptr::null(),
-                )
-            };
+            cvt!(libc::kevent(
+                self.kq,
+                changes.as_ptr(),
+                changes.len() as Count,
+                [].as_mut_ptr(),
+                0,
+                std::ptr::null(),
+            ))?;
         };
 
         if interests.is_writable() {
             let filter = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
             let changes = [kevent!(fd, libc::EVFILT_WRITE, filter, usize::from(token))];
-            unsafe {
-                libc::kevent(
-                    self.kq,
-                    changes.as_ptr(),
-                    changes.len() as Count,
-                    [].as_mut_ptr(),
-                    0,
-                    std::ptr::null(),
-                )
-            };
+            cvt!(libc::kevent(
+                self.kq,
+                changes.as_ptr(),
+                changes.len() as Count,
+                [].as_mut_ptr(),
+                0,
+                std::ptr::null(),
+            ))?;
         }
 
         Ok(())
@@ -132,7 +134,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> io::Result<Self> {
         Ok(Selector {
-            kq: unsafe { libc::kqueue() },
+            kq: cvt!(libc::kqueue()).unwrap(),
         })
     }
 
@@ -150,16 +152,14 @@ impl Selector {
         let n_events = events.capacity() as c_int;
         events.clear();
 
-        let cnt = unsafe {
-            libc::kevent(
-                self.kq,
-                ptr::null(),
-                0,
-                events.as_mut_ptr(),
-                n_events,
-                timeout,
-            )
-        };
+        let cnt = cvt!(libc::kevent(
+            self.kq,
+            ptr::null(),
+            0,
+            events.as_mut_ptr(),
+            n_events,
+            timeout,
+        ))?;
         unsafe { events.set_len(cnt as usize) };
         Ok(())
     }
