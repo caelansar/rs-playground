@@ -89,3 +89,82 @@ impl Interests {
         self.0 & WRITABLE != 0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io::{self, Write},
+        sync::mpsc::{self, SyncSender},
+        thread::{self, JoinHandle},
+        time::Duration,
+    };
+
+    use crate::{Events, Interests, Poll, Registrator, TcpStream};
+
+    struct Reactor {
+        handle: JoinHandle<()>,
+        registrator: Option<Registrator>,
+    }
+
+    impl Reactor {
+        fn new(sender: SyncSender<usize>) -> Reactor {
+            let mut poll = Poll::new().unwrap();
+            let registrator = poll.registrator();
+
+            // Set up the epoll/IOCP event loop in a seperate thread
+            let handle = thread::spawn(move || {
+                let mut events = Events::with_capacity(1024);
+                loop {
+                    println!("waiting {:?}", poll);
+                    match poll.poll(&mut events, Some(Duration::from_millis(100))) {
+                        Ok(..) => (),
+                        Err(ref e) if e.kind() == io::ErrorKind::Interrupted => break,
+                        Err(e) => panic!("Poll error: {:?}, {}", e.kind(), e),
+                    };
+
+                    for event in &events {
+                        let event_token = event.udata as usize;
+                        sender.send(event_token).expect("Send event_token err.");
+                    }
+                    // TODO: unregister
+                    break;
+                }
+            });
+
+            Reactor {
+                handle,
+                registrator: Some(registrator),
+            }
+        }
+
+        fn registrator(&mut self) -> Registrator {
+            self.registrator.take().unwrap()
+        }
+    }
+
+    #[test]
+    fn reactor_works() {
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let mut reactor = Reactor::new(sender);
+        let registrator = reactor.registrator();
+
+        let mut sock: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
+        let request = "GET / HTTP/1.1\r\n\
+                       Host: www.baidu.com\r\n\
+                       Connection: close\r\n\
+                       \r\n";
+        sock.write_all(request.as_bytes())
+            .expect("Error writing to stream");
+
+        registrator
+            .register(&sock, 99, Interests::READABLE)
+            .unwrap();
+
+        thread::spawn(move || {
+            while let Ok(token) = receiver.recv() {
+                assert_eq!(99, token);
+            }
+        });
+        reactor.handle.join().unwrap();
+    }
+}

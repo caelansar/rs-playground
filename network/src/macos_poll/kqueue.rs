@@ -3,7 +3,6 @@ use libc::{self, c_void};
 use std::cmp;
 use std::io::{self, IoSliceMut, Read, Write};
 use std::net;
-use std::ops::{Deref, DerefMut};
 use std::os::raw::{c_int, c_short};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
@@ -19,32 +18,22 @@ type Filter = c_short;
 type UData = *mut c_void;
 type Count = c_int;
 
-pub struct KeventList(Vec<libc::kevent>);
+pub type KeventList = Vec<libc::kevent>;
 
-impl Deref for KeventList {
-    type Target = Vec<libc::kevent>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub trait Zero {
+    fn zero() -> Self;
 }
 
-impl DerefMut for KeventList {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl KeventList {
-    pub fn zero() -> Self {
-        Self(vec![libc::kevent {
+impl Zero for KeventList {
+    fn zero() -> Self {
+        vec![libc::kevent {
             ident: 0,
             filter: 0,
             flags: 0,
             fflags: 0,
             data: 0,
             udata: 0 as *mut c_void,
-        }])
+        }]
     }
 }
 
