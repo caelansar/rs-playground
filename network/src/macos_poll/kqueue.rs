@@ -77,8 +77,8 @@ impl Registrator {
 
         let fd = stream.as_raw_fd();
         if interests.is_readable() {
-            let filter = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
-            let changes = [kevent!(fd, libc::EVFILT_READ, filter, usize::from(token))];
+            let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
+            let changes = [kevent!(fd, libc::EVFILT_READ, flags, usize::from(token))];
 
             cvt!(libc::kevent(
                 self.kq,
@@ -91,8 +91,8 @@ impl Registrator {
         };
 
         if interests.is_writable() {
-            let filter = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
-            let changes = [kevent!(fd, libc::EVFILT_WRITE, filter, usize::from(token))];
+            let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
+            let changes = [kevent!(fd, libc::EVFILT_WRITE, flags, usize::from(token))];
             cvt!(libc::kevent(
                 self.kq,
                 changes.as_ptr(),
@@ -106,12 +106,49 @@ impl Registrator {
         Ok(())
     }
 
-    pub fn unregister(&self, token: usize) -> io::Result<()> {
-        todo!()
+    pub fn deregister(&self, stream: &TcpStream) -> io::Result<()> {
+        let fd = stream.as_raw_fd();
+
+        let flags = libc::EV_DELETE | libc::EV_RECEIPT;
+        let mut changes = [
+            kevent!(fd, libc::EVFILT_READ, flags, ptr::null_mut()),
+            kevent!(fd, libc::EVFILT_WRITE, flags, ptr::null_mut()),
+        ];
+        cvt!(libc::kevent(
+            self.kq,
+            changes.as_ptr(),
+            changes.len() as c_int,
+            changes.as_mut_ptr(),
+            changes.len() as c_int,
+            ::std::ptr::null()
+        ))?;
+        Ok(())
     }
 
     pub fn close_loop(&self) -> io::Result<()> {
-        todo!()
+        if self
+            .is_poll_dead
+            .compare_and_swap(false, true, Ordering::SeqCst)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "Poll instance closed.",
+            ));
+        }
+
+        let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_CLEAR;
+        let changes = [kevent!(0, libc::EVFILT_TIMER, flags, 0)];
+
+        cvt!(libc::kevent(
+            self.kq,
+            changes.as_ptr(),
+            changes.len() as Count,
+            [].as_mut_ptr(),
+            0,
+            std::ptr::null(),
+        ))?;
+
+        Ok(())
     }
 }
 
@@ -227,41 +264,6 @@ impl AsRawFd for TcpStream {
         self.inner.as_raw_fd()
     }
 }
-
-pub fn kqueue() -> io::Result<i32> {
-    let fd = unsafe { super::ffi::kqueue() };
-    if fd < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(fd)
-}
-
-// pub fn kevent(
-//     kq: RawFd,
-//     cl: &[Kevent],
-//     el: &mut [Kevent],
-//     n_events: i32,
-//     timeout_ms: Option<i32>,
-// ) -> io::Result<usize> {
-//     let res = unsafe {
-//         let kq = kq as i32;
-//         let cl_len = cl.len() as i32;
-
-//         let timeout = timeout_ms.map(Timespec::from_millis);
-
-//         let timeout: *const Timespec = match &timeout {
-//             Some(n) => n,
-//             None => ptr::null(),
-//         };
-
-//         super::ffi::kevent(kq, cl.as_ptr(), cl_len, el.as_mut_ptr(), n_events, timeout)
-//     };
-//     if res < 0 {
-//         return Err(io::Error::last_os_error());
-//     }
-
-//     Ok(res as usize)
-// }
 
 pub fn close(fd: RawFd) -> io::Result<()> {
     let res = unsafe { super::ffi::close(fd) };

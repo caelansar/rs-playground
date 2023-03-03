@@ -95,7 +95,7 @@ mod tests {
     use std::{
         io::{self, Write},
         sync::mpsc::{self, SyncSender},
-        thread::{self, JoinHandle},
+        thread::{self, sleep, JoinHandle},
         time::Duration,
     };
 
@@ -122,12 +122,11 @@ mod tests {
                         Err(e) => panic!("Poll error: {:?}, {}", e.kind(), e),
                     };
 
+                    println!("events num: {}", events.len());
                     for event in &events {
                         let event_token = event.udata as usize;
                         sender.send(event_token).expect("Send event_token err.");
                     }
-                    // TODO: unregister
-                    break;
                 }
             });
 
@@ -148,23 +147,27 @@ mod tests {
         let mut reactor = Reactor::new(sender);
         let registrator = reactor.registrator();
 
-        let mut sock: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
+        let mut socket: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
         let request = "GET / HTTP/1.1\r\n\
                        Host: www.baidu.com\r\n\
                        Connection: close\r\n\
                        \r\n";
-        sock.write_all(request.as_bytes())
+        socket
+            .write_all(request.as_bytes())
             .expect("Error writing to stream");
 
         registrator
-            .register(&sock, 99, Interests::READABLE)
+            .register(&socket, 99, Interests::READABLE)
             .unwrap();
 
         thread::spawn(move || {
             while let Ok(token) = receiver.recv() {
+                println!("receive token");
                 assert_eq!(99, token);
+                registrator.deregister(&socket).unwrap();
             }
         });
-        reactor.handle.join().unwrap();
+
+        sleep(Duration::from_millis(1000));
     }
 }
