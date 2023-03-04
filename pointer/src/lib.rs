@@ -14,6 +14,36 @@ mod tests {
     use std::rc::{Rc, Weak};
 
     #[test]
+    fn test_autoref() {
+        #[derive(Clone)]
+        struct Container<T>(Arc<T>);
+
+        struct Container1<T>(Arc<T>);
+
+        impl<T> Clone for Container1<T> {
+            fn clone(&self) -> Self {
+                Self(self.0.clone())
+            }
+        }
+
+        let foo = &Container(Arc::new(1i32));
+        // SmartString is not Clone
+        let bar = &Container(Arc::new(SmartString::Standard("ss".to_string())));
+
+        // what is the type of _foo_clone & _bar_clone
+        let _foo_clone = foo.clone();
+        let _bar_clone = bar.clone();
+
+        let foo1 = &Container1(Arc::new(1i32));
+        // SmartString is not Clone
+        let bar1 = &Container1(Arc::new(SmartString::Standard("ss".to_string())));
+
+        // what is the type of _foo_clone1 & _bar_clone1
+        let _foo1_clone = foo1.clone();
+        let _bar1_clone = bar1.clone();
+    }
+
+    #[test]
     fn smart_string_should_work() {
         let a: SmartString = "aaaaa".into();
         let b: SmartString = "b".repeat(31).into();
@@ -140,6 +170,7 @@ mod tests {
     }
 
     use std::cell::RefCell as RefCell1;
+    use std::sync::Arc;
 
     #[test]
     fn circular_reference_should_work() {
