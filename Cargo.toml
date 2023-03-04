@@ -18,4 +18,5 @@ members = [
     "ser",
     "closure",
     "network",
+    "motorex"
 ]
