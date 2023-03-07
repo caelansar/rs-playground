@@ -19,5 +19,6 @@ members = [
     "closure",
     "network",
     "motorex",
-    "generic"
+    "generic",
+    "pin",
 ]
