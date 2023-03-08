@@ -2,6 +2,7 @@
 #![feature(string_leak)]
 
 mod cancel_decorator;
+mod delay;
 mod line_stream;
 mod time_decorator;
 
@@ -19,12 +20,19 @@ async fn request() -> String {
 mod tests {
     use crate::{
         cancel_decorator::spawn,
+        delay::Delay,
         line_stream::{line_stream, LineStream},
         request, time_decorator,
     };
     use anyhow::{self, Result};
-    use futures::{SinkExt, StreamExt};
-    use std::{pin::Pin, sync::Arc, time::Duration};
+    use futures::{Future, SinkExt, StreamExt};
+    use std::{
+        future::poll_fn,
+        pin::Pin,
+        sync::Arc,
+        task::Poll,
+        time::{Duration, Instant},
+    };
     use tokio::{
         io::{AsyncBufReadExt, BufReader},
         net::TcpListener,
@@ -33,6 +41,25 @@ mod tests {
     };
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{Framed, LinesCodec};
+
+    #[tokio::test]
+    async fn delay_should_work() {
+        let when = Instant::now() + Duration::from_secs(1);
+        let mut delay = Some(Delay::new(when));
+
+        poll_fn(move |cx| {
+            let mut delay = delay.take().unwrap();
+            let res = Pin::new(&mut delay).poll(cx);
+            assert!(res.is_pending());
+            tokio::spawn(async move {
+                delay.await;
+            });
+
+            Poll::Ready(())
+        })
+        .await;
+        sleep(Duration::from_secs(2)).await
+    }
 
     #[tokio::test]
     async fn line_stream_should_work() {
