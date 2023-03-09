@@ -70,7 +70,7 @@ fn parse<'a, P: ConfigParser<'a>>(data: &'a str, parser: P) -> Result<P::Cfg, Pa
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
+    use std::{borrow::Cow, hint::black_box};
 
     use serde_json::json;
     use test::Bencher;
@@ -132,5 +132,19 @@ mod tests {
             let user = parse(&json, parser).unwrap();
             dbg!(user.name);
         })
+    }
+
+    #[bench]
+    fn bench_string_clone(b: &mut Bencher) {
+        let data = [0u8; 102400];
+        let s = String::from_utf8_lossy(&data).into_owned();
+        b.iter(|| black_box(s.clone()))
+    }
+
+    #[bench]
+    fn bench_mem_take(b: &mut Bencher) {
+        let data = [0u8; 102400];
+        let mut s = String::from_utf8_lossy(&data).into_owned();
+        b.iter(|| black_box(std::mem::take(&mut s)))
     }
 }
