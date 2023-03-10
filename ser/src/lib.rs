@@ -1,4 +1,6 @@
 #![feature(test)]
+#![allow(dead_code)]
+
 extern crate test;
 
 use std::{fmt::Debug, marker::PhantomData};
@@ -72,7 +74,6 @@ fn parse<'a, P: ConfigParser<'a>>(data: &'a str, parser: P) -> Result<P::Cfg, Pa
 mod tests {
     use std::{borrow::Cow, hint::black_box};
 
-    use serde_json::json;
     use test::Bencher;
 
     use super::*;
@@ -81,6 +82,11 @@ mod tests {
     struct CowUser<'a> {
         #[serde(borrow)]
         name: Cow<'a, str>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct RefUser<'a> {
+        name: &'a str,
     }
 
     #[derive(Debug, Deserialize)]
@@ -108,30 +114,29 @@ mod tests {
         assert_eq!(point, cfg);
     }
 
-    #[bench]
-    fn bench_owned_user(b: &mut Bencher) {
-        let data = [0u8; 102400];
-        let s = String::from_utf8_lossy(&data);
-        let v = json!({"name": s, "age": 20});
-        let json = serde_json::to_string_pretty(&v).unwrap();
+    static JSON_USER: &str = r#"{"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "age": 20}"#;
+
+    fn bench_user<'a, T: Deserialize<'a> + Debug>(b: &mut Bencher) {
         b.iter(|| {
-            let parser: JsonParser<OwnedUser> = JsonParser::new();
-            let user = parse(&json, parser).unwrap();
-            dbg!(user.name);
+            let parser: JsonParser<T> = JsonParser::new();
+            let user = parse(&JSON_USER, parser).unwrap();
+            black_box(user);
         })
     }
 
     #[bench]
+    fn bench_owned_user(b: &mut Bencher) {
+        bench_user::<OwnedUser>(b)
+    }
+
+    #[bench]
+    fn bench_ref_user(b: &mut Bencher) {
+        bench_user::<RefUser>(b)
+    }
+
+    #[bench]
     fn bench_cow_user(b: &mut Bencher) {
-        let data = [0u8; 102400];
-        let s = String::from_utf8_lossy(&data);
-        let v = json!({"name": s, "age": 20});
-        let json = serde_json::to_string_pretty(&v).unwrap();
-        b.iter(|| {
-            let parser: JsonParser<CowUser> = JsonParser::new();
-            let user = parse(&json, parser).unwrap();
-            dbg!(user.name);
-        })
+        bench_user::<CowUser>(b)
     }
 
     #[bench]
