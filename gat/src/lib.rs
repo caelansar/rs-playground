@@ -1,6 +1,7 @@
 mod family;
 mod lending_iter;
 mod mapper;
+mod ref_iter;
 
 use family::*;
 use lending_iter::*;
@@ -8,6 +9,8 @@ use mapper::*;
 
 #[cfg(test)]
 mod tests {
+    use crate::ref_iter::{RefIterator, StrRefHolder};
+
     use super::*;
 
     fn uni_map<T, U, M, F>(mapper: M, f: F) -> M::Result<U>
@@ -65,15 +68,27 @@ mod tests {
     fn test_lending_trait() {
         let mut data = [1, 2, 3, 4, 5, 6];
         let mut win = WindowsMut::new(&mut data, 0, 3);
-        loop {
-            match win.next() {
-                Some(data) => println!("{:?}", data),
-                None => break,
-            }
-        }
+
+        let v = win.next();
+        assert_eq!(Some(&mut [1, 2, 3][..]), v);
+
+        // cannot borrow `win` as mutable more than once at a time
+        // let v1 = win.next();
+        // use v later
+        // println!("{:?}", v);
 
         let data = [1, 2, 3, 4, 5, 6];
         let result = data.into_iter().window_count(3).collect::<Vec<Vec<_>>>();
         assert_eq!(vec![vec![1, 2, 3], vec![4, 5, 6]], result);
+    }
+
+    #[test]
+    fn test_ref_iterator() {
+        let s = "hello world";
+        let mut str_ref = StrRefHolder::new(s);
+
+        while let Some(v) = str_ref.next() {
+            println!("ref iter: {}", v)
+        }
     }
 }
