@@ -1,4 +1,7 @@
 #![allow(unused)]
+#![feature(min_specialization)]
+
+use specialization::Test;
 
 mod no_generic {
     use std::collections::HashMap;
@@ -99,6 +102,28 @@ mod generic {
     }
 }
 
+mod specialization {
+    use std::fmt::Debug;
+
+    pub trait Test {
+        fn test(&self);
+    }
+
+    impl<T: Debug> Test for T {
+        default fn test(&self) {
+            println!("{:?} impl Test trait", self);
+        }
+    }
+
+    pub struct A;
+
+    impl Test for A {
+        fn test(&self) {
+            println!("A impl Test trait");
+        }
+    }
+}
+
 fn main() {
     let manager = generic::PasswordManager::new("password".to_owned());
     let mut manager = manager.unlock("password".to_owned());
@@ -112,4 +137,9 @@ fn main() {
     manager.lock();
     manager.list_passwords(); // misuse
     manager.lock(); // misuse
+
+    let a = specialization::A;
+    a.test();
+
+    0.test();
 }
