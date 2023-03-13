@@ -74,6 +74,7 @@ fn parse<'a, P: ConfigParser<'a>>(data: &'a str, parser: P) -> Result<P::Cfg, Pa
 mod tests {
     use std::{borrow::Cow, hint::black_box};
 
+    use serde_json::json;
     use test::Bencher;
 
     use super::*;
@@ -114,29 +115,37 @@ mod tests {
         assert_eq!(point, cfg);
     }
 
-    static JSON_USER: &str = r#"{"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "age": 20}"#;
-
-    fn bench_user<'a, T: Deserialize<'a> + Debug>(b: &mut Bencher) {
+    fn bench_user<'a: 'b, 'b, T: Deserialize<'b> + Debug>(b: &mut Bencher, s: &'a str) {
         b.iter(|| {
             let parser: JsonParser<T> = JsonParser::new();
-            let user = parse(&JSON_USER, parser).unwrap();
+            let user = parse(&s, parser).unwrap();
             black_box(user);
         })
     }
 
+    fn gen_json_string() -> String {
+        let data = [65u8; 1024];
+        let s = String::from_utf8_lossy(&data).into_owned();
+        let v = json!({"name": s, "age": 20});
+        serde_json::to_string(&v).unwrap()
+    }
+
     #[bench]
     fn bench_owned_user(b: &mut Bencher) {
-        bench_user::<OwnedUser>(b)
+        let s = gen_json_string();
+        bench_user::<OwnedUser>(b, &s)
     }
 
     #[bench]
     fn bench_ref_user(b: &mut Bencher) {
-        bench_user::<RefUser>(b)
+        let s = gen_json_string();
+        bench_user::<RefUser>(b, s.as_str())
     }
 
     #[bench]
     fn bench_cow_user(b: &mut Bencher) {
-        bench_user::<CowUser>(b)
+        let s = gen_json_string();
+        bench_user::<CowUser>(b, &s)
     }
 
     #[bench]
