@@ -10,6 +10,7 @@ mod tests {
     use crate::rc::Rc as Rc1;
     use crate::refcell::{RefCell, RefMut};
     use crate::string::*;
+    use std::borrow::Cow;
     use std::collections::HashMap;
     use std::rc::{Rc, Weak};
 
@@ -188,5 +189,26 @@ mod tests {
 
         assert_eq!(2, b.fn_b());
         assert_eq!(1, b.reference.borrow().upgrade().unwrap().fn_a());
+    }
+
+    #[test]
+    fn url_cow_should_work() {
+        let url = url::Url::parse("http://cae.com/?a=foo&b=bar&c=hello%20world").unwrap();
+        let mut pairs = url.query_pairs();
+
+        assert_eq!(
+            pairs.next(),
+            Some((Cow::Borrowed("a"), Cow::Borrowed("foo")))
+        );
+
+        assert_eq!(
+            pairs.next(),
+            Some((Cow::Borrowed("b"), Cow::Borrowed("bar")))
+        );
+
+        assert_eq!(
+            pairs.next(),
+            Some((Cow::Borrowed("c"), Cow::Borrowed("hello world")))
+        );
     }
 }
