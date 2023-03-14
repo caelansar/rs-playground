@@ -44,9 +44,12 @@ impl<'a, T: ?Sized> Trait<&'a T> for T {
 
 fn bar(b: impl for<'a> Trait<&'a usize>) {
     #[allow(unused_labels)]
-    'y: {
+    'x: {
         let x: usize = 10;
-        b.do_something(&x);
+        #[allow(unused_labels)]
+        'a: {
+            b.do_something(&x);
+        }
     }
 }
 
