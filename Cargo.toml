@@ -22,4 +22,5 @@ members = [
     "generic",
     "pin",
     "lifetime",
+    "mem",
 ]
