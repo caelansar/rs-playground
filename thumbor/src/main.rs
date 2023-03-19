@@ -1,6 +1,8 @@
+use accept_header::Accept;
 use anyhow::Result;
 use axum::{
     extract::Path,
+    http::header::ACCEPT,
     http::{HeaderMap, HeaderValue, StatusCode},
     routing::get,
     Extension, Router, Server,
@@ -8,6 +10,7 @@ use axum::{
 use bytes::Bytes;
 use image::ImageOutputFormat;
 use lru::LruCache;
+use mime::Mime;
 use percent_encoding::percent_decode_str;
 use serde::Deserialize;
 use std::{
@@ -67,9 +70,47 @@ async fn root() -> &'static str {
     "Pic"
 }
 
+struct OutputFormat(ImageOutputFormat);
+
+impl From<Mime> for OutputFormat {
+    fn from(value: Mime) -> Self {
+        match value.to_string().as_str() {
+            "image/png" => OutputFormat(ImageOutputFormat::Png),
+            "image/apng" => OutputFormat(ImageOutputFormat::Png),
+            "image/jpeg" => OutputFormat(ImageOutputFormat::Jpeg(85)),
+            "image/webp" => OutputFormat(ImageOutputFormat::WebP),
+            _ => OutputFormat(ImageOutputFormat::Jpeg(85)),
+        }
+    }
+}
+
+fn get_format(headers: HeaderMap) -> OutputFormat {
+    let accept_header = headers.get(ACCEPT).map(|v| v.as_bytes());
+    let mut format = OutputFormat(ImageOutputFormat::Png);
+    if let Some(accept_header) = accept_header {
+        let str_accept = String::from_utf8_lossy(accept_header);
+        let accept: Accept = str_accept.parse().unwrap();
+        println!("accepts {:?}", accept);
+
+        let available: Vec<Mime> = vec![
+            "image/png".parse().unwrap(),
+            "image/apng".parse().unwrap(),
+            "image/jpeg".parse().unwrap(),
+            "image/webp".parse().unwrap(),
+        ];
+
+        let negotiated = accept.negotiate(&available).unwrap();
+        println!("negotiated: {}", negotiated);
+
+        format = negotiated.into();
+    }
+    format
+}
+
 async fn generate(
     Path(Params { spec, url }): Path<Params>,
     Extension(cache): Extension<Cache>,
+    headers: HeaderMap,
 ) -> Result<(HeaderMap, Vec<u8>), StatusCode> {
     let url = percent_decode_str(&url).decode_utf8_lossy();
     let spec: ImageSpec = spec
@@ -86,7 +127,9 @@ async fn generate(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     engine.apply(&spec.specs);
 
-    let img = engine.generate(ImageOutputFormat::Jpeg(85));
+    let format = get_format(headers);
+    println!("output format: {:?}", format.0);
+    let img = engine.generate(format.0);
 
     info!("done, image size {}", img.len());
 

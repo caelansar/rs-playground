@@ -6,11 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.5.17"
+axum = { version = "0.5.17", features = ["headers"] }
+mime = "0.3.16"
+accept-header = "0.2.3"
 anyhow = "1.0"
 base64 = "0.13.1"
 bytes = "1.2.1"
-image = "0.24.5"
+image = { version = "0.24.5", features = ["webp-encoder"] }
 lazy_static = "1.4.0"
 lru = "0.8.1"
 percent-encoding = "2.2.0"
