@@ -42,9 +42,67 @@ impl<'r> Iterator for StrSplit<'r> {
     }
 }
 
+struct Interface<'a, 'b: 'a> {
+    manager: &'a mut Manager<'b>,
+}
+
+impl<'a, 'b: 'a> Drop for Interface<'a, 'b> {
+    fn drop(&mut self) {
+        println!("interface drop")
+    }
+}
+
+impl<'a, 'b: 'a> Interface<'a, 'b> {
+    pub fn noop(self) {
+        println!("interface consumed");
+    }
+}
+
+struct Manager<'a> {
+    text: &'a str,
+}
+
+struct List<'a> {
+    manager: Manager<'a>,
+}
+
+impl Drop for List<'_> {
+    fn drop(&mut self) {
+        println!("list drop")
+    }
+}
+
+impl<'a> List<'a> {
+    pub fn get_interface<'b>(&'b mut self) -> Interface<'b, 'a>
+    where
+        'a: 'b,
+    {
+        Interface {
+            manager: &mut self.manager,
+        }
+    }
+}
+
+fn use_list(list: &List) {
+    println!("{}", list.manager.text);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn borrow_should_work() {
+        let mut list = List {
+            manager: Manager { text: "hello" },
+        };
+
+        list.get_interface().noop();
+
+        println!("Interface should be dropped here and the borrow released");
+
+        use_list(&list);
+    }
 
     #[test]
     fn strtok_should_work() {
@@ -87,5 +145,31 @@ mod tests {
             let parts: Vec<_> = StrSplit::new(testcase.input, ' ').collect();
             assert_eq!(testcase.output, parts);
         })
+    }
+
+    #[test]
+    fn copy_test() {
+        let mut a = Some(Box::new(4));
+        let b = a.as_ref(); // create a new option
+        let c = &b;
+        let c1 = &b;
+        let d = (*c).unwrap();
+        // println!("{:?}", a);
+        println!("{:?}", b);
+        println!("{:p}", c);
+        // is_copy(b);
+        println!("{:p}", c1);
+        println!("{:?}", d);
+
+        let point = Point { x: 1, y: 2 };
+        is_copy(point);
+    }
+
+    fn is_copy<T: Copy>(_: T) {}
+
+    #[derive(Clone, Copy)]
+    struct Point {
+        x: i32,
+        y: i32,
     }
 }
