@@ -91,6 +91,24 @@ fn use_list(list: &List) {
 mod tests {
     use super::*;
 
+    // fn return_first<'a>(a: &'a mut [u8], b: &'a mut [u8]) -> &'a mut [u8] {
+    //     a
+    // }
+
+    // b has a different lifetime
+    fn return_first<'a>(a: &'a mut [u8], b: &'_ mut [u8]) -> &'a mut [u8] {
+        a
+    }
+
+    #[test]
+    fn test_mut_lifetime() {
+        let mut a1 = [1, 2, 3];
+        let mut a2 = [4, 5, 6];
+        let r = return_first(&mut a1, &mut a2);
+        a2[0] = 100;
+        r[0] = 100;
+    }
+
     #[test]
     fn borrow_should_work() {
         let mut list = List {
