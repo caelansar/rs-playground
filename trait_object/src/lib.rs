@@ -65,6 +65,10 @@ static mut Foo_for_String_vtable: FooVtable = FooVtable {
 mod tests {
     use super::*;
 
+    use std::fmt::{Debug, Error, Formatter};
+    use std::mem::transmute;
+    use std::ops::Deref;
+
     #[test]
     fn test_trait_object() {
         let mut a = "foo".to_string();
@@ -92,5 +96,36 @@ mod tests {
         // y.method();
         let r = unsafe { ((*(y.vtable as *mut FooVtable)).method)(y.data as *const ()) };
         println!("u8 trait object: {}", r);
+    }
+
+    #[test]
+    fn test_trait_object2() {
+        let v = vec![1, 2, 3, 4];
+
+        let a: &Vec<i32> = &v;
+        let b0: &[i32] = &v;
+        let b1: &[i32] = v.deref();
+        let c: &dyn Debug = &v;
+
+        println!("a: {}", a as *const _ as usize);
+        println!("b0: {:?}", unsafe { transmute::<_, (usize, usize)>(b0) });
+        println!("b1: {:?}", unsafe { transmute::<_, (usize, usize)>(b1) });
+        println!("c: {:?}", unsafe { transmute::<_, (usize, usize)>(c) });
+
+        struct Wrap<'a, T>(&'a fn(&T, &mut Formatter) -> Result<(), Error>, &'a T);
+
+        impl<'a, T> Debug for Wrap<'a, T> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                f.write_str(">>Wrap Debug<<");
+                self.0(self.1, f)
+            }
+        }
+
+        let (_, vtable) = unsafe { transmute::<_, (usize, usize)>(c) };
+        let fmt_fn = unsafe {
+            &*((vtable as *const usize).offset(3)
+                as *const fn(&Vec<i32>, &mut Formatter) -> Result<(), Error>)
+        };
+        println!("{:?}", Wrap(fmt_fn, &v));
     }
 }
