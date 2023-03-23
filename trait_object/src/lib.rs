@@ -116,14 +116,26 @@ mod tests {
 
         impl<'a, T> Debug for Wrap<'a, T> {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                f.write_str(">>Wrap Debug<<");
+                let _ = f.write_str(">>Wrap Debug<<");
                 self.0(self.1, f)
             }
         }
 
         let (_, vtable) = unsafe { transmute::<_, (usize, usize)>(c) };
+
+        let vtable_layout = unsafe { &*(vtable as *const [usize; 4]) };
+        println!(
+            "drop: {}, size: {}, align: {}",
+            vtable_layout[0], vtable_layout[1], vtable_layout[2]
+        );
+        println!("method {:?}", &vtable_layout[3]);
+
+        println!("method (by offset){}", unsafe {
+            &*((vtable as *const usize).offset(3) as *const usize)
+        });
+
         let fmt_fn = unsafe {
-            &*((vtable as *const usize).offset(3)
+            &*((&vtable_layout[3] as *const usize)
                 as *const fn(&Vec<i32>, &mut Formatter) -> Result<(), Error>)
         };
         println!("{:?}", Wrap(fmt_fn, &v));
