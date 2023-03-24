@@ -23,4 +23,5 @@ members = [
     "pin",
     "lifetime",
     "mem",
+    "ownership",
 ]
