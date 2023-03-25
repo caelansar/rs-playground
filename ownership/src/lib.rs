@@ -1,3 +1,5 @@
+#![feature(vec_into_raw_parts)]
+
 use std::{fmt::Debug, mem};
 
 fn extend_vec(v: &mut Vec<i32>) {
@@ -6,8 +8,11 @@ fn extend_vec(v: &mut Vec<i32>) {
 
 fn print_vec<T: Debug>(data: Vec<T>) {
     println!("data: {:?}", data);
-    let p = unsafe { mem::transmute::<_, [usize; 3]>(data) };
-    println!("cap: {}, ptr: 0x{:x}, size: {}", p[0], p[1], p[2]);
+    let (ptr, len, cap) = data.into_raw_parts();
+    println!(
+        "ptr: 0x{:x}, len: {}, cap: {}, ",
+        ptr as *const usize as usize, len, cap
+    );
 }
 
 #[cfg(test)]
