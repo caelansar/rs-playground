@@ -1,9 +1,9 @@
 #![feature(vec_into_raw_parts)]
 
-use std::{fmt::Debug, mem};
+use std::fmt::Debug;
 
 fn extend_vec(v: &mut Vec<i32>) {
-    (2..6).into_iter().for_each(|i| v.push(i));
+    v.extend(2..33)
 }
 
 fn print_vec<T: Debug>(data: Vec<T>) {
@@ -31,6 +31,12 @@ mod tests {
         extend_vec(&mut v);
 
         println!("new heap start: {:p}", &v[0] as *const i32);
+
+        v.truncate(10);
+        assert_eq!(v.capacity(), 32);
+
+        v.shrink_to_fit();
+        assert_eq!(v.capacity(), 10);
 
         print_vec(v);
     }
