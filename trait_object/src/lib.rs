@@ -65,7 +65,7 @@ static mut Foo_for_String_vtable: FooVtable = FooVtable {
 mod tests {
     use super::*;
 
-    use std::fmt::{Debug, Error, Formatter};
+    use std::fmt::{Debug, Display, Error, Formatter};
     use std::mem::transmute;
     use std::ops::Deref;
 
@@ -139,5 +139,35 @@ mod tests {
                 as *const fn(&Vec<i32>, &mut Formatter) -> Result<(), Error>)
         };
         println!("{:?}", Wrap(fmt_fn, &v));
+    }
+
+    #[test]
+    fn test_trait_object3() {
+        let s1 = String::from("hello world!");
+        let s2 = String::from("goodbye world!");
+
+        let w1: &dyn Display = &s1;
+        let w2: &dyn Debug = &s1;
+
+        let w3: &dyn Display = &s2;
+        let w4: &dyn Debug = &s2;
+
+        let (addr1, vtable1) = unsafe { transmute::<_, (usize, usize)>(w1) };
+        let (addr2, vtable2) = unsafe { transmute::<_, (usize, usize)>(w2) };
+        let (addr3, vtable3) = unsafe { transmute::<_, (usize, usize)>(w3) };
+        let (addr4, vtable4) = unsafe { transmute::<_, (usize, usize)>(w4) };
+
+        println!("s1: {:p}, s2: {:p}", &s1, &s2);
+
+        println!("addr1: 0x{:x}, vtable1: 0x{:x}", addr1, vtable1);
+        println!("addr2: 0x{:x}, vtable2: 0x{:x}", addr2, vtable2);
+        println!("addr3: 0x{:x}, vtable3: 0x{:x}", addr3, vtable3);
+        println!("addr4: 0x{:x}, vtable4: 0x{:x}", addr4, vtable4);
+
+        assert_eq!(addr1, addr2);
+        assert_eq!(addr3, addr4);
+
+        assert_eq!(vtable1, vtable3);
+        assert_eq!(vtable2, vtable4);
     }
 }
