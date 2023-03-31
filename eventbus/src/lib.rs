@@ -30,13 +30,14 @@ where
     }
 }
 
-impl<F> Handler<i32> for F
+impl<F, T1> Handler<(T1,)> for F
 where
-    F: FnOnce(i32) + Copy,
+    F: FnOnce(T1) + Copy,
+    T1: FromRequest<T1> + std::marker::Copy,
 {
-    fn call(&self, req: Request<i32>) {
-        let data = FromRequest::<i32>::from_request(&req);
-        (self)(data)
+    fn call(&self, req: Request<(T1,)>) {
+        let data: (T1,) = FromRequest::<(T1,)>::from_request(&req);
+        (self)(data.0)
     }
 }
 
@@ -62,6 +63,90 @@ where
     }
 }
 
+#[macro_export]
+macro_rules! new_request {
+    ($e:expr) => {{
+        {
+            Request::new(($e,))
+        }
+    }};
+
+
+    ($($e:expr),*) => {{
+        Request::new(($($e,)*))
+    }};
+}
+
+macro_rules! all_primitive_type {
+    ($name:ident) => {
+        $name!(i8);
+        $name!(i32);
+        $name!(i64);
+        $name!(i128);
+        $name!(isize);
+        $name!(u8);
+        $name!(u32);
+        $name!(u64);
+        $name!(u128);
+        $name!(usize);
+        $name!(f32);
+        $name!(f64);
+        $name!(char);
+        $name!(bool);
+    };
+}
+
+macro_rules! impl_from_request {
+    ($ty:ident) => {
+        impl FromRequest<$ty> for $ty {
+            fn from_request(req: &Request<$ty>) -> Self {
+                req.data
+            }
+        }
+    };
+}
+
+all_primitive_type!(impl_from_request);
+
+impl<'a> FromRequest<&'a str> for &'a str {
+    fn from_request(req: &Request<&'a str>) -> Self {
+        req.data
+    }
+}
+
+impl<'a, T1> FromRequest<&'a T1> for &'a T1
+where
+    T1: FromRequest<T1> + Copy,
+{
+    fn from_request(req: &Request<&'a T1>) -> Self {
+        req.data
+    }
+}
+
+impl<T1: Copy, const N: usize> FromRequest<[T1; N]> for [T1; N] {
+    fn from_request(req: &Request<[T1; N]>) -> Self {
+        req.data
+    }
+}
+
+impl<'a, T1> FromRequest<&'a [T1]> for &'a [T1]
+where
+    T1: FromRequest<T1> + Copy,
+{
+    fn from_request(req: &Request<&'a [T1]>) -> Self {
+        req.data
+    }
+}
+
+impl<T1> FromRequest<(T1,)> for (T1,)
+where
+    T1: FromRequest<T1> + Copy,
+{
+    fn from_request(req: &Request<(T1,)>) -> Self {
+        req.data
+    }
+}
+
 impl<T1, T2> FromRequest<(T1, T2)> for (T1, T2)
 where
     T1: Copy,
@@ -79,18 +164,6 @@ where
     T3: Copy,
 {
     fn from_request(req: &Request<(T1, T2, T3)>) -> Self {
-        req.data
-    }
-}
-
-impl<'a> FromRequest<&'a str> for &'a str {
-    fn from_request(req: &Request<&'a str>) -> Self {
-        req.data
-    }
-}
-
-impl FromRequest<i32> for i32 {
-    fn from_request(req: &Request<i32>) -> Self {
         req.data
     }
 }
@@ -142,20 +215,20 @@ impl EventBus {
                 inner.insert(h);
             }
         }
+        // println!("subscribe T: {}", std::any::type_name::<T>());
     }
 
-    pub fn publish<T: 'static>(&self, topic: impl AsRef<str> + Display, arg: T) {
+    pub fn publish<T: 'static>(&self, topic: impl AsRef<str> + Display, arg: Request<T>) {
         self.dispatch(topic, arg);
     }
 
-    fn dispatch<T: 'static>(&self, topic: impl AsRef<str> + Display, arg: T) {
+    fn dispatch<T: 'static>(&self, topic: impl AsRef<str> + Display, arg: Request<T>) {
         if let Some(handlers) = self.handlers.get::<HandlerMap<T>>() {
             handlers
                 .get(topic.as_ref())
                 .ok_or("handler not found")
                 .and_then(|x| {
-                    let req = Request::new(arg);
-                    x.handler.call(req);
+                    x.handler.call(arg);
                     Ok(())
                 })
                 .unwrap();
@@ -172,19 +245,30 @@ mod tests {
     #[test]
     fn eventbus_works() {
         let mut bus = EventBus::new();
-        bus.subscribe("topic0".to_string(), |x: i32| {
-            println!("closure accept i32")
+        bus.subscribe("topic0".to_string(), |x: &i32| {
+            println!("closure accept &str: {x}")
         });
         bus.subscribe("topic1".to_string(), |x: i32, y: i32| {
-            println!("closure accept i32, i32")
+            println!("closure accept i32: {x}, i32: {y}")
         });
         bus.subscribe("topic2".to_string(), |x: i32, y: &str, z: i32| {
-            println!("closure accept i32, &str, i32")
+            println!("closure accept i32: {x}, &str: {y}, i32: {z}")
         });
         bus.subscribe("topic3".to_string(), || println!("closure have no param"));
 
-        bus.publish("topic1", (1i32, 2i32));
-        bus.publish("topic2", (1i32, "100", 2i32));
-        bus.publish("topic3", ());
+        bus.subscribe("topic4".to_string(), |x: [u8; 2]| {
+            println!("closure accept [u8]: {x:?}")
+        });
+
+        bus.subscribe("topic5".to_string(), |x: &[i32]| {
+            println!("closure accept &[i32]: {x:?}")
+        });
+
+        bus.publish("topic0", new_request!(&1i32));
+        bus.publish("topic1", new_request!(1i32, 2i32));
+        bus.publish("topic2", new_request!(1i32, "100", 2i32));
+        bus.publish("topic3", new_request!());
+        bus.publish("topic4", new_request!([1u8, 2]));
+        bus.publish("topic5", new_request!(&[1i32, 2][..]));
     }
 }
