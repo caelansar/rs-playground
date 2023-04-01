@@ -110,8 +110,7 @@ mod tests {
     }
 
     fn run_in_background() -> SocketAddr {
-        let listener =
-            TcpListener::bind("127.0.0.1:5000").expect("Could not bind ephemeral socket");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("Could not bind ephemeral socket");
         let addr = listener.local_addr().unwrap();
 
         println!("Listening on {}", addr);
