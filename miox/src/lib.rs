@@ -6,14 +6,14 @@ mod tests {
     use std::collections::HashMap;
     use std::error::Error;
     use std::io::{self, Read, Write};
+    use std::net::SocketAddr;
 
     #[cfg(test)]
     fn register(
+        addr: SocketAddr,
         sockets: &mut HashMap<Token, TcpStream>,
         poll: &Poll,
     ) -> Result<(), Box<dyn Error>> {
-        let addr = "127.0.0.1:5000".parse()?;
-
         for i in 0..10 {
             // Setup the client socket.
             let mut client = TcpStream::connect(addr)?;
@@ -27,11 +27,19 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn mio_server_should_works() -> Result<(), Box<dyn Error>> {
-        let addr = "0.0.0.0:5001".parse()?;
-        let mut listener = TcpListener::bind(addr).unwrap();
+    #[cfg(test)]
+    fn run_in_background() -> SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0".parse().unwrap())
+            .expect("Could not bind ephemeral socket");
+        let addr = listener.local_addr().unwrap();
+        println!("Listening on {}", addr);
 
+        std::thread::spawn(move || run_mio_server(listener).unwrap());
+        addr
+    }
+
+    #[cfg(test)]
+    fn run_mio_server(mut listener: TcpListener) -> Result<(), Box<dyn Error>> {
         // Create a poll instance.
         let mut poll = Poll::new()?;
         // Create storage for events.
@@ -125,8 +133,10 @@ mod tests {
         let mut poll = Poll::new()?;
         // Create storage for events.
         let mut events = Events::with_capacity(128);
+        // Start mio server in background
+        let addr = run_in_background();
 
-        register(&mut sockets, &poll)?;
+        register(addr, &mut sockets, &poll)?;
 
         let mut buffer = [0u8; 1024];
 
@@ -148,7 +158,8 @@ mod tests {
                         let token = event.token();
                         if event.is_writable() {
                             // If socket has not been written before
-                            let req = "GET / HTTP/1.1\r\nHost: 127.0.0.1:5000\r\n\r\n";
+                            let req =
+                                format!("GET / HTTP/1.1\r\nHost: {}\r\n\r\n", addr.to_string());
                             println!("Write data for token {}", token.0);
                             // Write to the socket without blocking.
                             let socket = sockets.get_mut(&token).unwrap();
