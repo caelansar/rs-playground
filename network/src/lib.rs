@@ -7,7 +7,9 @@ use std::time::Duration;
 
 #[cfg(target_os = "macos")]
 mod macos_poll;
+#[cfg(target_os = "macos")]
 use macos_poll::kqueue::KeventList;
+#[cfg(target_os = "macos")]
 pub use macos_poll::kqueue::{Registrator, Selector, TcpStream};
 
 #[cfg(target_os = "macos")]
@@ -24,11 +26,13 @@ pub type Token = usize;
 /// another. In this case you'll need to call the `Poll::registrator()` method which returns a `Registrator`
 /// tied to this event queue which can be sent to another thread and used to register events.
 #[derive(Debug)]
+#[cfg(target_os = "macos")]
 pub struct Poll {
     registry: Registry,
     is_poll_dead: Arc<AtomicBool>,
 }
 
+#[cfg(target_os = "macos")]
 impl Poll {
     pub fn new() -> io::Result<Poll> {
         Selector::new().map(|selector| Poll {
@@ -64,6 +68,7 @@ impl Poll {
 }
 
 #[derive(Debug)]
+#[cfg(target_os = "macos")]
 pub struct Registry {
     selector: Selector,
 }
@@ -91,6 +96,7 @@ impl Interests {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 mod tests {
     use std::{
         io::{self, Write},
