@@ -1,8 +1,10 @@
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ImageSpec {
     #[prost(message, repeated, tag = "1")]
     pub specs: ::prost::alloc::vec::Vec<Spec>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Resize {
     #[prost(uint32, tag = "1")]
@@ -16,17 +18,7 @@ pub struct Resize {
 }
 /// Nested message and enum types in `Resize`.
 pub mod resize {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum ResizeType {
         Normal = 0,
@@ -43,18 +35,16 @@ pub mod resize {
                 ResizeType::SeamCarve => "SEAM_CARVE",
             }
         }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "NORMAL" => Some(Self::Normal),
+                "SEAM_CARVE" => Some(Self::SeamCarve),
+                _ => None,
+            }
+        }
     }
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum SampleFilter {
         Unknown = 0,
@@ -79,8 +69,21 @@ pub mod resize {
                 SampleFilter::Lanczos3 => "LANCZOS3",
             }
         }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "UNKNOWN" => Some(Self::Unknown),
+                "NEAREST" => Some(Self::Nearest),
+                "TRIANGLE" => Some(Self::Triangle),
+                "CATMULL_ROM" => Some(Self::CatmullRom),
+                "GAUSSIAN" => Some(Self::Gaussian),
+                "LANCZOS3" => Some(Self::Lanczos3),
+                _ => None,
+            }
+        }
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Watermark {
     #[prost(uint32, tag = "1")]
@@ -88,10 +91,13 @@ pub struct Watermark {
     #[prost(uint32, tag = "2")]
     pub y: u32,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Fliph {}
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Flipv {}
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Filter {
     #[prost(enumeration = "filter::Filter", tag = "1")]
@@ -99,17 +105,7 @@ pub struct Filter {
 }
 /// Nested message and enum types in `Filter`.
 pub mod filter {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Filter {
         Unknown = 0,
@@ -130,8 +126,19 @@ pub mod filter {
                 Filter::Twenties => "TWENTIES",
             }
         }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "UNKNOWN" => Some(Self::Unknown),
+                "FLAGBLUE" => Some(Self::Flagblue),
+                "LIQUID" => Some(Self::Liquid),
+                "TWENTIES" => Some(Self::Twenties),
+                _ => None,
+            }
+        }
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Spec {
     #[prost(oneof = "spec::Data", tags = "1, 2, 3, 4, 5")]
@@ -139,6 +146,7 @@ pub struct Spec {
 }
 /// Nested message and enum types in `Spec`.
 pub mod spec {
+    #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Data {
         #[prost(message, tag = "1")]
