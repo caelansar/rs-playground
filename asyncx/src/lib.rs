@@ -89,6 +89,17 @@ mod tests {
         assert!(elapsed >= Duration::from_secs(2));
     }
 
+    #[tokio::test]
+    async fn time_decorator1_should_work() {
+        let task = request();
+        let td = time_decorator::TimeDecorator1::new(task);
+
+        let (data, elapsed) = td.await;
+
+        assert_eq!("content", data);
+        assert!(elapsed >= Duration::from_secs(2));
+    }
+
     async fn cancelled_task(data: Arc<Mutex<i32>>) {
         sleep(Duration::from_millis(100)).await;
         println!("in cancelled_task");
