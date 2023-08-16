@@ -6,14 +6,71 @@ mod delay;
 mod line_stream;
 mod time_decorator;
 
-use std::time::Duration;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
+use futures::Future;
 use tokio::time::sleep;
+
+use crate::delay::Delay;
 
 #[allow(dead_code)]
 async fn request() -> String {
     sleep(Duration::from_secs(2)).await;
     "content".to_string()
+}
+
+async fn delay(data: String) -> u32 {
+    println!("{data}");
+    Delay::new(Instant::now() + Duration::from_secs(1)).await;
+    10
+}
+
+struct DelayFuture {
+    data: String,
+    state: DelayFutureState,
+}
+
+enum DelayFutureState {
+    Init,
+    Delay(Delay),
+    Done,
+}
+
+impl DelayFuture {
+    fn new(data: String) -> Self {
+        Self {
+            data,
+            state: DelayFutureState::Init,
+        }
+    }
+}
+
+impl Future for DelayFuture {
+    type Output = u32;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> std::task::Poll<Self::Output> {
+        loop {
+            match self.as_mut().get_mut().state {
+                DelayFutureState::Init => {
+                    println!("{}", &self.data);
+                    let fut = Delay::new(Instant::now() + Duration::from_secs(1));
+                    self.as_mut().get_mut().state = DelayFutureState::Delay(fut)
+                }
+                DelayFutureState::Delay(ref mut fut) => match Pin::new(fut).poll(cx) {
+                    Poll::Ready(_) => {
+                        self.as_mut().get_mut().state = DelayFutureState::Done;
+                        return Poll::Ready(10);
+                    }
+                    Poll::Pending => return Poll::Pending,
+                },
+                DelayFutureState::Done => unreachable!("poll a completed future"),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -41,6 +98,18 @@ mod tests {
     };
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{Framed, LinesCodec};
+
+    #[tokio::test]
+    async fn delay_future_should_work() {
+        let ret = super::delay("hello".into()).await;
+        println!("delay future done, value: {}", ret)
+    }
+
+    #[tokio::test]
+    async fn manually_delay_future_should_work() {
+        let ret = super::DelayFuture::new("hello".into()).await;
+        println!("manually delay future done, value: {}", ret)
+    }
 
     #[tokio::test]
     async fn delay_should_work() {
