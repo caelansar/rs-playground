@@ -4,6 +4,7 @@
 mod cancel_decorator;
 mod delay;
 mod line_stream;
+mod rt;
 mod time_decorator;
 
 use std::{

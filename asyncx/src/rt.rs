@@ -1,9 +1,10 @@
 use crossbeam::channel;
-use futures::task::{self, ArcWake};
+use futures::task::ArcWake;
 use std::future::Future;
+use std::mem::{forget, ManuallyDrop};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::Context;
+use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use std::thread;
 
 struct Runtime {
@@ -24,7 +25,11 @@ impl ArcWake for Task {
 
 impl Task {
     fn poll(self: Arc<Self>) {
-        let waker = task::waker(self.clone());
+        // let waker = task::waker(self.clone());
+        let self_clone = self.clone();
+        let waker = waker_fn(move || {
+            let _ = self_clone.executor.send(self_clone.clone());
+        });
         let mut cx = Context::from_waker(&waker);
 
         let mut future = self.future.lock().unwrap();
@@ -66,6 +71,43 @@ impl Runtime {
                 task.poll()
             }
         });
+    }
+}
+
+pub fn waker_fn<F: Fn() + Send + Sync + 'static>(f: F) -> Waker {
+    let raw = Arc::into_raw(Arc::new(f)) as *const ();
+    let vtable = &WakerFn::<F>::VTABLE;
+    unsafe { Waker::from_raw(RawWaker::new(raw, vtable)) }
+}
+
+struct WakerFn<F>(F);
+
+impl<F: Fn() + Send + Sync + 'static> WakerFn<F> {
+    const VTABLE: RawWakerVTable = RawWakerVTable::new(
+        Self::clone_waker,
+        Self::wake,
+        Self::wake_by_ref,
+        Self::drop_waker,
+    );
+
+    unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
+        let arc = ManuallyDrop::new(Arc::from_raw(ptr as *const F));
+        forget(arc.clone());
+        RawWaker::new(ptr, &Self::VTABLE)
+    }
+
+    unsafe fn wake(ptr: *const ()) {
+        let arc = Arc::from_raw(ptr as *const F);
+        (arc)();
+    }
+
+    unsafe fn wake_by_ref(ptr: *const ()) {
+        let arc = ManuallyDrop::new(Arc::from_raw(ptr as *const F));
+        (arc)();
+    }
+
+    unsafe fn drop_waker(ptr: *const ()) {
+        drop(Arc::from_raw(ptr as *const F));
     }
 }
 
