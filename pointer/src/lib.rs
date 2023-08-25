@@ -95,13 +95,37 @@ mod tests {
         assert_eq!(None, rc_weak.upgrade());
     }
 
-    struct SomeStruct {
-        regular_field: u8,
-        special_field: Cell<u8>,
+    #[test]
+    fn weak_ptr_drop() {
+        #[allow(dead_code)]
+        struct Foo {
+            s: &'static str,
+        }
+
+        impl Drop for Foo {
+            fn drop(&mut self) {
+                println!("foo drop");
+            }
+        }
+
+        let foo = Rc::new(Foo { s: "hello" });
+        let foo1 = Rc::downgrade(&foo);
+        let foo2 = Weak::clone(&foo1);
+
+        drop(foo1);
+        drop(foo);
+
+        assert!(foo2.upgrade().is_none());
     }
 
     #[test]
     fn cell_should_work() {
+        #[allow(dead_code)]
+        struct SomeStruct {
+            regular_field: u8,
+            special_field: Cell<u8>,
+        }
+
         let my_struct = SomeStruct {
             regular_field: 0,
             special_field: Cell::new(1),
