@@ -26,4 +26,5 @@ members = [
     "ownership",
     "eventbus",
     "function",
+    "wait_group",
 ]
