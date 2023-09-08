@@ -27,4 +27,5 @@ members = [
     "eventbus",
     "function",
     "wait_group",
+    "hash",
 ]

@@ -61,6 +61,10 @@ mod tests {
             println!("data: {:?}", data);
             println!("v: {:?}, name: {:?}", v, name.clone());
         };
+        assert_eq!(
+            size_of_val(&closure),
+            24/*name*/ + 12/*data*/ + 4/*v*/ + 8 /*padding*/
+        );
         closure(1);
         println!("vec: {:?}", vec); // still valid
 
