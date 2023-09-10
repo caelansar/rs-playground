@@ -5,6 +5,8 @@ use std::task::{Context, Poll, Waker};
 use std::thread;
 use std::time::Instant;
 
+use futures::task::AtomicWaker;
+
 pub struct Delay {
     when: Instant,
     waker: Option<Arc<Mutex<Waker>>>,
@@ -52,5 +54,82 @@ impl Future for Delay {
             println!("pending");
             Poll::Pending
         }
+    }
+}
+
+pub struct DelayAtomic {
+    shared: Arc<Shared>,
+}
+
+struct Shared {
+    when: Instant,
+    waker: AtomicWaker,
+}
+
+impl DelayAtomic {
+    #[allow(dead_code)]
+    pub fn new(when: Instant) -> Self {
+        let shared = Shared {
+            when,
+            waker: AtomicWaker::new(),
+        };
+        Self {
+            shared: Arc::new(shared),
+        }
+    }
+}
+
+impl Future for DelayAtomic {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        self.shared.waker.register(cx.waker());
+        let shared = Arc::clone(&self.shared);
+
+        thread::spawn(move || {
+            let now = Instant::now();
+
+            if now < shared.when {
+                thread::sleep(shared.when - now);
+            }
+            shared.waker.wake();
+        });
+
+        if Instant::now() >= self.shared.when {
+            println!("ready");
+            Poll::Ready(())
+        } else {
+            println!("pending");
+            Poll::Pending
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{future::poll_fn, time::Duration};
+
+    use tokio::time::sleep;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_atomic_waker() {
+        let when = Instant::now() + Duration::from_secs(1);
+        let mut delay = Some(DelayAtomic::new(when));
+
+        poll_fn(move |cx| {
+            let mut delay = delay.take().unwrap();
+            let res = Pin::new(&mut delay).poll(cx);
+            assert!(res.is_pending());
+            tokio::spawn(async move {
+                delay.await;
+            });
+
+            Poll::Ready(())
+        })
+        .await;
+
+        sleep(Duration::from_secs(2)).await
     }
 }
