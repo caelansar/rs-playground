@@ -1,7 +1,10 @@
+#![feature(impl_trait_in_assoc_type)]
+
 mod family;
 mod lending_iter;
 mod mapper;
 mod ref_iter;
+mod select;
 
 use family::*;
 use lending_iter::*;
