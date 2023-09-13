@@ -1,6 +1,8 @@
 #![feature(negative_impls)]
 #![feature(string_leak)]
+#![feature(impl_trait_in_assoc_type)]
 
+mod async_trait;
 mod cancel_decorator;
 mod delay;
 mod line_stream;
