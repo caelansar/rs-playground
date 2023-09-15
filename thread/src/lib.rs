@@ -79,4 +79,52 @@ mod tests {
         });
         assert_eq!(n.into_inner().unwrap(), 1000);
     }
+
+    use loom::sync::{atomic::AtomicUsize, atomic::Ordering};
+
+    #[test]
+    fn concurrent_inc_work() {
+        loom::model(|| {
+            let num = loom::sync::Arc::new(AtomicUsize::new(0));
+
+            let ths: Vec<_> = (0..2)
+                .map(|_| {
+                    let num = num.clone();
+                    loom::thread::spawn(move || {
+                        num.fetch_add(1, Ordering::AcqRel);
+                    })
+                })
+                .collect();
+
+            for th in ths {
+                th.join().unwrap();
+            }
+
+            assert_eq!(2, num.load(Ordering::Relaxed));
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn concurrent_inc_failed() {
+        loom::model(|| {
+            let num = loom::sync::Arc::new(AtomicUsize::new(0));
+
+            let ths: Vec<_> = (0..2)
+                .map(|_| {
+                    let num = num.clone();
+                    loom::thread::spawn(move || {
+                        let curr = num.load(Ordering::Acquire);
+                        num.store(curr + 1, Ordering::Release);
+                    })
+                })
+                .collect();
+
+            for th in ths {
+                th.join().unwrap();
+            }
+
+            assert_eq!(2, num.load(Ordering::Relaxed));
+        });
+    }
 }
