@@ -1,3 +1,5 @@
+mod async_lifetime;
+
 pub fn strtok<'a>(s: &mut &'a str, delimiter: char) -> &'a str {
     if let Some(i) = s.find(delimiter) {
         let prefix = &s[..i];
