@@ -1,3 +1,8 @@
+#![feature(closure_lifetime_binder)]
+#![allow(dead_code)]
+
+mod peculiar;
+
 use std::fmt::Debug;
 
 trait OptionFilter<T> {
