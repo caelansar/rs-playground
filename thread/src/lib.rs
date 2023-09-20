@@ -127,4 +127,23 @@ mod tests {
             assert_eq!(2, num.load(Ordering::Relaxed));
         });
     }
+
+    #[test]
+    fn release_acquire() {
+        use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+        use std::sync::atomic::{AtomicBool, AtomicU64};
+
+        let data: &'static AtomicU64 = Box::leak(Box::new(AtomicU64::new(0)));
+        let ready: &'static AtomicBool = Box::leak(Box::new(AtomicBool::new(false)));
+
+        thread::spawn(|| {
+            data.store(123, Relaxed);
+            ready.store(true, Release); // Everything from before this store ..
+        });
+        while !ready.load(Acquire) {
+            // .. is visible after this loads `true`.
+            thread::sleep(Duration::from_millis(100));
+        }
+        assert_eq!(data.load(Relaxed), 123);
+    }
 }
