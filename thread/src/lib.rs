@@ -146,4 +146,38 @@ mod tests {
         }
         assert_eq!(data.load(Relaxed), 123);
     }
+
+    #[test]
+    fn test_scope_and_move() {
+        let mut a = 0;
+
+        thread::scope(|s| {
+            s.spawn(|| {
+                a += 1;
+            });
+        });
+
+        thread::scope(|s| {
+            s.spawn(|| {
+                a += 1;
+            });
+        });
+
+        assert_eq!(a, 2);
+
+        let mut a = 0;
+
+        let t1 = thread::spawn(move || {
+            a += 1; //copy
+        });
+
+        let t2 = thread::spawn(move || {
+            a += 1; //copy
+        });
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+
+        assert_eq!(a, 0);
+    }
 }
