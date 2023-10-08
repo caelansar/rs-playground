@@ -32,7 +32,7 @@ impl Zero for KeventList {
             flags: 0,
             fflags: 0,
             data: 0,
-            udata: 0 as *mut c_void,
+            udata: std::ptr::null_mut::<c_void>(),
         }]
     }
 }
@@ -78,7 +78,7 @@ impl Registrator {
         let fd = stream.as_raw_fd();
         if interests.is_readable() {
             let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
-            let changes = [kevent!(fd, libc::EVFILT_READ, flags, usize::from(token))];
+            let changes = [kevent!(fd, libc::EVFILT_READ, flags, token)];
 
             cvt!(libc::kevent(
                 self.kq,
@@ -92,7 +92,7 @@ impl Registrator {
 
         if interests.is_writable() {
             let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
-            let changes = [kevent!(fd, libc::EVFILT_WRITE, flags, usize::from(token))];
+            let changes = [kevent!(fd, libc::EVFILT_WRITE, flags, token)];
             cvt!(libc::kevent(
                 self.kq,
                 changes.as_ptr(),
