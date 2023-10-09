@@ -122,9 +122,8 @@ impl EventBus {
             handlers
                 .get(topic.as_ref())
                 .ok_or("handler not found")
-                .and_then(|x| {
+                .map(|x| {
                     x.handler.call(arg);
-                    Ok(())
                 })
                 .unwrap();
         } else {

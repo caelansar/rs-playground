@@ -78,7 +78,7 @@ async fn get_users(
     let session_id = get_session_id(&headers, &params);
     println!("session_id: {:?}", session_id);
 
-    return Json(vec![
+    Json(vec![
         User {
             id: 1,
             username: "a".to_string(),
@@ -87,7 +87,7 @@ async fn get_users(
             id: 2,
             username: "b".to_string(),
         },
-    ]);
+    ])
 }
 
 // the input to our `create_user` handler
