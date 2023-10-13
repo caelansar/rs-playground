@@ -283,7 +283,7 @@ mod tests {
         let selector = Selector::new().unwrap();
         let mut sock = TcpStream::connect("www.baidu.com:80").unwrap();
         let poll_is_dead = Arc::new(AtomicBool::new(false));
-        let registrator = selector.registrator(poll_is_dead.clone());
+        let registrator = selector.registrator(poll_is_dead);
 
         registrator
             .register(&mut sock, 1, Interests::READABLE)
@@ -301,7 +301,7 @@ mod tests {
         sock.write_all(request.as_bytes())
             .expect("Error writing to stream");
         let poll_is_dead = Arc::new(AtomicBool::new(false));
-        let registrator = selector.registrator(poll_is_dead.clone());
+        let registrator = selector.registrator(poll_is_dead);
 
         registrator
             .register(&sock, 99, Interests::READABLE)
@@ -329,7 +329,7 @@ mod tests {
             .expect("Error writing to stream");
 
         let poll_is_dead = Arc::new(AtomicBool::new(false));
-        let registrator = selector.registrator(poll_is_dead.clone());
+        let registrator = selector.registrator(poll_is_dead);
 
         registrator
             .register(&sock, 100, Interests::READABLE)
@@ -357,7 +357,7 @@ mod tests {
         let mut sock: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
 
         let poll_is_dead = Arc::new(AtomicBool::new(false));
-        let registrator = selector.registrator(poll_is_dead.clone());
+        let registrator = selector.registrator(poll_is_dead);
 
         registrator
             .register(&sock, 99, Interests::WRITABLE)

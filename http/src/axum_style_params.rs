@@ -102,6 +102,6 @@ mod tests {
     fn test_axum_like_params() {
         let req = Request;
         on(req.clone(), handler1);
-        on(req.clone(), handler2);
+        on(req, handler2);
     }
 }
