@@ -17,12 +17,10 @@ macro_rules! new_config {
 }
 
 fn with_timeout(timeout: u32) -> impl FnOnce(&mut Config) {
-    let f = move |cfg: &mut Config| cfg.timeout = timeout;
-    f
+    move |cfg: &mut Config| cfg.timeout = timeout
 }
 fn with_retry(retry: bool) -> impl FnOnce(&mut Config) {
-    let f = move |cfg: &mut Config| cfg.retry = retry;
-    f
+    move |cfg: &mut Config| cfg.retry = retry
 }
 
 fn main() {
