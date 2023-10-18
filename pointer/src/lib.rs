@@ -235,4 +235,21 @@ mod tests {
             Some((Cow::Borrowed("c"), Cow::Borrowed("hello world")))
         );
     }
+
+    #[test]
+    fn test_mut_borrow() {
+        let mut vec: Vec<i32> = vec![0, 1, 2];
+        let (ref0, ref1): (&mut Vec<i32>, &i32) = unsafe {
+            let ptr0 = (&mut vec) as *mut Vec<i32>;
+            let ptr1 = &vec[1];
+            (&mut *ptr0, ptr1)
+        };
+        assert_eq!(*ref1, 1);
+
+        for i in 0..100000000 {
+            ref0.push(i);
+        }
+        // undefined behavior
+        assert_ne!(*ref1, 1);
+    }
 }
