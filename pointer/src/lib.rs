@@ -1,4 +1,5 @@
 mod cell;
+mod manually;
 mod rc;
 mod refcell;
 mod string;
