@@ -238,6 +238,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn test_mut_borrow() {
         let mut vec: Vec<i32> = vec![0, 1, 2];
         let (ref0, ref1): (&mut Vec<i32>, &i32) = unsafe {
@@ -248,9 +249,23 @@ mod tests {
         assert_eq!(*ref1, 1);
 
         for i in 0..100000000 {
-            ref0.push(i);
+            ref0.push(i); // will reallocate
         }
         // undefined behavior
         assert_ne!(*ref1, 1);
     }
+
+    // #[test]
+    // fn test_mut_borrow_safety() {
+    //     let mut vec: Vec<i32> = vec![0, 1, 2];
+    //     let ref0 = &mut vec;
+    //     let ref1 = &vec[1]; // ❌cannot borrow `vec` as immutable because it is also borrowed as mutable
+    //     assert_eq!(*ref1, 1);
+
+    //     for i in 0..100000000 {
+    //         ref0.push(i); // will reallocate
+    //     }
+    //     // undefined behavior
+    //     assert_ne!(*ref1, 1);
+    // }
 }

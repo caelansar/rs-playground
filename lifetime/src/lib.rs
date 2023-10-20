@@ -168,8 +168,28 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_ref() {
+        let x = 10;
+        let r;
+        {
+            let y = 20;
+            let rf = Ref { x: &x, y: &y };
+            r = rf.x;
+            println!("{r}");
+        }
+        // ❌`y` does not live long enough
+        // println!("{r}");
+    }
+
+    #[allow(dead_code)]
+    struct Ref<'a> {
+        x: &'a u8,
+        y: &'a u8,
+    }
+
+    #[test]
     fn copy_test() {
-        let mut a = Some(Box::new(4));
+        let a = Some(Box::new(4));
         let b = a.as_ref(); // create a new option
         let c = &b;
         let c1 = &b;
@@ -188,6 +208,7 @@ mod tests {
     fn is_copy<T: Copy>(_: T) {}
 
     #[derive(Clone, Copy)]
+    #[allow(dead_code)]
     struct Point {
         x: i32,
         y: i32,
