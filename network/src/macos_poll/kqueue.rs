@@ -1,4 +1,4 @@
-use crate::{Events, Interests};
+use crate::{EventID, Events, Interests, TcpStream, Token};
 use libc::{self, c_void};
 use std::cmp;
 use std::io::{self, IoSliceMut, Read, Write};
@@ -19,6 +19,12 @@ type UData = *mut c_void;
 type Count = c_int;
 
 pub type KeventList = Vec<libc::kevent>;
+
+impl EventID for libc::kevent {
+    fn id(&self) -> Token {
+        self.udata as Token
+    }
+}
 
 pub trait Zero {
     fn zero() -> Self;
@@ -208,60 +214,6 @@ impl Drop for Selector {
                 }
             }
         }
-    }
-}
-
-pub struct TcpStream {
-    inner: net::TcpStream,
-}
-
-impl TcpStream {
-    pub fn connect(adr: impl net::ToSocketAddrs) -> io::Result<Self> {
-        // actually we should set this to non-blocking before we call connect which is not something
-        // we get from the stdlib but could do with a syscall. Let's skip that step in this example.
-        // In other words this will block shortly establishing a connection to the remote server
-        let stream = net::TcpStream::connect(adr)?;
-        stream.set_nonblocking(true)?;
-
-        Ok(TcpStream { inner: stream })
-    }
-}
-
-impl Read for TcpStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        // If we let the socket operate non-blocking we could get an error of kind `WouldBlock`,
-        // that means there is more data to read but we would block if we waited for it to arrive.
-        // The right thing to do is to re-register the event, getting notified once more
-        // data is available. We'll not do that in our implementation since we're making an example
-        // and instead we make the socket blocking again while we read from it
-        self.inner.set_nonblocking(false)?;
-        (&self.inner).read(buf)
-    }
-
-    /// Copies data to fill each buffer in order, with the final buffer possibly only beeing
-    /// partially filled. Now as we'll see this is like it's made for our use case when abstracting
-    /// over IOCP AND epoll/kqueue (since we need to buffer anyways).
-    ///
-    /// IoSliceMut is like `&mut [u8]` but it's guaranteed to be ABI compatible with the `iovec`
-    /// type on unix platforms and `WSABUF` on Windows. Perfect for us.
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut]) -> io::Result<usize> {
-        (&self.inner).read_vectored(bufs)
-    }
-}
-
-impl Write for TcpStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
-impl AsRawFd for TcpStream {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
     }
 }
 

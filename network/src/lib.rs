@@ -1,19 +1,30 @@
-use std::io;
+use std::io::{IoSliceMut, Read, Write};
+use std::os::fd::{AsRawFd, RawFd};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use std::time::Duration;
+use std::{io, net};
+
+#[cfg(target_os = "linux")]
+mod linux_poll;
+
+#[cfg(target_os = "linux")]
+pub use linux_poll::epoll::{Registrator, Selector};
 
 #[cfg(target_os = "macos")]
 mod macos_poll;
+
 #[cfg(target_os = "macos")]
-use macos_poll::kqueue::KeventList;
-#[cfg(target_os = "macos")]
-pub use macos_poll::kqueue::{Registrator, Selector, TcpStream};
+pub use macos_poll::kqueue::{KeventList, Registrator, Selector};
 
 #[cfg(target_os = "macos")]
 pub type Events = KeventList;
+
+#[cfg(target_os = "linux")]
+pub type Events = linux_poll::epoll::Events;
+
 pub type Token = usize;
 
 /// `Poll` represents the event queue. The `poll` method will block the current thread
@@ -26,13 +37,11 @@ pub type Token = usize;
 /// another. In this case you'll need to call the `Poll::registrator()` method which returns a `Registrator`
 /// tied to this event queue which can be sent to another thread and used to register events.
 #[derive(Debug)]
-#[cfg(target_os = "macos")]
 pub struct Poll {
     registry: Registry,
     is_poll_dead: Arc<AtomicBool>,
 }
 
-#[cfg(target_os = "macos")]
 impl Poll {
     pub fn new() -> io::Result<Poll> {
         Selector::new().map(|selector| Poll {
@@ -68,7 +77,6 @@ impl Poll {
 }
 
 #[derive(Debug)]
-#[cfg(target_os = "macos")]
 pub struct Registry {
     selector: Selector,
 }
@@ -95,8 +103,66 @@ impl Interests {
     }
 }
 
+pub struct TcpStream {
+    inner: net::TcpStream,
+}
+
+impl TcpStream {
+    pub fn connect(adr: impl net::ToSocketAddrs) -> io::Result<Self> {
+        // actually we should set this to non-blocking before we call connect which is not something
+        // we get from the stdlib but could do with a syscall. Let's skip that step in this example.
+        // In other words this will block shortly establishing a connection to the remote server
+        let stream = net::TcpStream::connect(adr)?;
+        stream.set_nonblocking(true)?;
+
+        Ok(TcpStream { inner: stream })
+    }
+}
+
+impl Read for TcpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        // If we let the socket operate non-blocking we could get an error of kind `WouldBlock`,
+        // that means there is more data to read but we would block if we waited for it to arrive.
+        // The right thing to do is to re-register the event, getting notified once more
+        // data is available. We'll not do that in our implementation since we're making an example
+        // and instead we make the socket blocking again while we read from it
+        self.inner.set_nonblocking(false)?;
+
+        (&self.inner).read(buf)
+    }
+
+    /// Copies data to fill each buffer in order, with the final buffer possibly only beeing
+    /// partially filled. Now as we'll see this is like it's made for our use case when abstracting
+    /// over IOCP AND epoll/kqueue (since we need to buffer anyways).
+    ///
+    /// IoSliceMut is like `&mut [u8]` but it's guaranteed to be ABI compatible with the `iovec`
+    /// type on unix platforms and `WSABUF` on Windows. Perfect for us.
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut]) -> io::Result<usize> {
+        (&self.inner).read_vectored(bufs)
+    }
+}
+
+impl Write for TcpStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl AsRawFd for TcpStream {
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
+}
+
+trait EventID {
+    fn id(&self) -> Token;
+}
+
 #[cfg(test)]
-#[cfg(target_os = "macos")]
 mod tests {
     use std::{
         io::{self, Write},
@@ -105,11 +171,11 @@ mod tests {
         time::Duration,
     };
 
-    use crate::{Events, Interests, Poll, Registrator, TcpStream};
+    use crate::{EventID, Events, Interests, Poll, Registrator, TcpStream};
 
     struct Reactor {
         handle: JoinHandle<()>,
-        registrator: Option<Registrator>,
+        register: Option<Registrator>,
     }
 
     impl Reactor {
@@ -117,7 +183,7 @@ mod tests {
             let mut poll = Poll::new().unwrap();
             let registrator = poll.registrator();
 
-            // Set up the epoll/IOCP event loop in a seperate thread
+            // Set up the kqueue/epoll/IOCP event loop in a separated thread
             let handle = thread::spawn(move || {
                 let mut events = Events::with_capacity(1024);
                 loop {
@@ -130,7 +196,8 @@ mod tests {
 
                     println!("events num: {}", events.len());
                     for event in &events {
-                        let event_token = event.udata as usize;
+                        let event_token = event.id();
+                        println!("send token: {}", event_token);
                         sender.send(event_token).expect("Send event_token err.");
                     }
                 }
@@ -138,12 +205,12 @@ mod tests {
 
             Reactor {
                 handle,
-                registrator: Some(registrator),
+                register: Some(registrator),
             }
         }
 
         fn registrator(&mut self) -> Registrator {
-            self.registrator.take().unwrap()
+            self.register.take().unwrap()
         }
     }
 
@@ -153,7 +220,7 @@ mod tests {
         let mut reactor = Reactor::new(sender);
         let registrator = reactor.registrator();
 
-        let mut socket: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
+        let mut socket = TcpStream::connect("www.baidu.com:80").unwrap();
         let request = "GET / HTTP/1.1\r\n\
                        Host: www.baidu.com\r\n\
                        Connection: close\r\n\
