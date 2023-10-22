@@ -1,41 +1,43 @@
-pub const EPOLL_CTL_ADD: i32 = 1;
-pub const EPOLL_CTL_DEL: i32 = 2;
-pub const EPOLLIN: i32 = 0x1;
-pub const EPOLLONESHOT: i32 = 0x40000000;
+use crate::cvt;
+use libc::c_int;
+use std::io;
 
-/// Since the same name is used multiple times, it can be confusing but we have an `Event` structure.
-/// This structure ties a file descriptor and a field called `events` together. The field `events` holds information
-/// about what events are ready for that file descriptor.
-#[repr(C, packed)]
-pub struct Event {
-    /// This can be confusing, but this is the events that are ready on the file descriptor.
-    events: u32,
-    epoll_data: usize,
+pub(crate) fn epoll_create() -> io::Result<i32> {
+    // Size argument is ignored but must be greater than zero
+    cvt!(libc::epoll_create(1))
 }
 
-impl Event {
-    pub fn new(events: i32, id: usize) -> Self {
-        Event {
-            events: events as u32,
-            epoll_data: id,
-        }
-    }
-    pub fn data(&self) -> usize {
-        self.epoll_data
-    }
+pub(crate) fn close_fd(fd: i32) -> io::Result<i32> {
+    cvt!(libc::close(fd as c_int))
 }
 
-#[link(name = "c")]
-extern "C" {
-    pub fn epoll_create(size: i32) -> i32;
+pub(crate) fn epoll_ctl(
+    epfd: i32,
+    op: i32,
+    fd: i32,
+    event: &mut libc::epoll_event,
+) -> io::Result<i32> {
+    cvt!(libc::epoll_ctl(
+        epfd,
+        op,
+        fd,
+        event as *mut libc::epoll_event
+    ))
+}
 
-    pub fn close(fd: i32) -> i32;
-
-    pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: *mut Event) -> i32;
-
-    /// - epoll_event is a pointer to an array of Events
-    /// - timeout of -1 means indefinite
-    pub fn epoll_wait(epfd: i32, events: *mut Event, maxevents: i32, timeout: i32) -> i32;
-
-    pub fn eventfd(initva: u32, flags: i32) -> i32;
+/// Waits for events on the epoll instance to occur. Returns the number file descriptors ready for the requested I/O.
+/// When successful, epoll_wait() returns the number of file descriptors ready for the requested
+/// I/O, or zero if no file descriptor became ready during the requested timeout milliseconds
+pub(crate) fn epoll_wait(
+    epfd: i32,
+    events: &mut [libc::epoll_event],
+    maxevents: i32,
+    timeout: i32,
+) -> io::Result<i32> {
+    cvt!(libc::epoll_wait(
+        epfd,
+        events.as_mut_ptr(),
+        maxevents,
+        timeout
+    ))
 }

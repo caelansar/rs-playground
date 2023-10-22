@@ -1,4 +1,4 @@
-use super::ffi;
+use super::ffi::{close_fd, epoll_create, epoll_ctl, epoll_wait};
 use crate::{EventID, Interests, TcpStream, Token};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
@@ -7,7 +7,9 @@ use std::sync::{
 };
 use std::{io, time};
 
-pub type Events = Vec<Event>;
+const READ_FLAG: i32 = libc::EPOLLIN | libc::EPOLLONESHOT;
+
+pub type Events = Vec<libc::epoll_event>;
 
 pub struct Registrator {
     fd: RawFd,
@@ -29,10 +31,11 @@ impl Registrator {
         }
         let fd = stream.as_raw_fd();
         if interests.is_readable() {
-            // We register the id (or most oftenly referred to as a Token) to the `udata` field
-            // if the `Kevent`
-            let mut event = ffi::Event::new(ffi::EPOLLIN | ffi::EPOLLONESHOT, token);
-            epoll_ctl(self.fd, ffi::EPOLL_CTL_ADD, fd, &mut event)?;
+            let mut event = libc::epoll_event {
+                events: READ_FLAG as u32,
+                u64: token as u64,
+            };
+            epoll_ctl(self.fd, libc::EPOLL_CTL_ADD, fd, &mut event)?;
         };
 
         if interests.is_writable() {
@@ -44,25 +47,6 @@ impl Registrator {
 
     pub fn deregister(&self, stream: &TcpStream) -> io::Result<()> {
         println!("unimplemented!");
-        Ok(())
-    }
-
-    pub fn close_loop(&self) -> io::Result<()> {
-        if self
-            .is_poll_dead
-            .compare_and_swap(false, true, Ordering::SeqCst)
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
-                "Poll instance closed.",
-            ));
-        }
-
-        // This is a little hacky but works for our needs right now
-        let wake_fd = eventfd(1, 0)?;
-        let mut event = ffi::Event::new(ffi::EPOLLIN, 0);
-        epoll_ctl(self.fd, ffi::EPOLL_CTL_ADD, wake_fd, &mut event)?;
-
         Ok(())
     }
 }
@@ -79,7 +63,7 @@ impl Selector {
         })
     }
 
-    /// This function blocks and waits until an event has been recieved. `timeout` None means
+    /// This function blocks and waits until an event has been received. `timeout` None means
     /// the poll will never time out.
     pub fn select(
         &self,
@@ -88,7 +72,7 @@ impl Selector {
     ) -> io::Result<()> {
         events.clear();
         let timeout = timeout_ms.unwrap_or(time::Duration::from_millis(100));
-        epoll_wait(self.fd, events, 1024, -1).map(|n_events| {
+        epoll_wait(self.fd, events, 1024, timeout.as_millis() as i32).map(|n_events| {
             // This is safe because `syscall_kevent` ensures that `n_events` are
             // assigned. We could check for a valid token for each event to verify so this is
             // just a performance optimization used in `mio` and copied here.
@@ -117,58 +101,42 @@ impl Drop for Selector {
     }
 }
 
-pub type Event = ffi::Event;
-impl EventID for Event {
+impl EventID for libc::epoll_event {
     fn id(&self) -> Token {
-        self.data()
+        self.u64 as Token
     }
 }
 
-fn epoll_create() -> io::Result<i32> {
-    // Size argument is ignored but must be greater than zero
-    let res = unsafe { ffi::epoll_create(1) };
-    if res < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(res)
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::Interests;
+    use super::*;
+    use std::io::Write;
 
-fn close_fd(fd: i32) -> io::Result<()> {
-    let res = unsafe { ffi::close(fd) };
-    if res < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
+    #[test]
+    fn epoll_works() {
+        let selector = Selector::new().unwrap();
+        let mut sock: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
+        let request = "GET / HTTP/1.1\r\n\
+                       Host: www.baidu.com\r\n\
+                       Connection: close\r\n\
+                       \r\n";
+        sock.write_all(request.as_bytes())
+            .expect("Error writing to stream");
+        let poll_is_dead = Arc::new(AtomicBool::new(false));
+        let registrator = selector.registrator(poll_is_dead);
 
-fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: &mut Event) -> io::Result<()> {
-    let res = unsafe { ffi::epoll_ctl(epfd, op, fd, event) };
-    if res < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
+        registrator
+            .register(&sock, 99, Interests::READABLE)
+            .unwrap();
 
-/// Waits for events on the epoll instance to occur. Returns the number file descriptors ready for the requested I/O.
-/// When successful, epoll_wait() returns the number of file descriptors ready for the requested
-/// I/O, or zero if no file descriptor became ready during the requested timeout milliseconds
-fn epoll_wait(epfd: i32, events: &mut [Event], maxevents: i32, timeout: i32) -> io::Result<i32> {
-    let res = unsafe { ffi::epoll_wait(epfd, events.as_mut_ptr(), maxevents, timeout) };
-    if res < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(res)
-    }
-}
+        let mut events = Events::with_capacity(16);
 
-fn eventfd(initva: u32, flags: i32) -> io::Result<i32> {
-    let res = unsafe { ffi::eventfd(initva, flags) };
-    if res < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(res)
+        selector
+            .select(&mut events, None)
+            .expect("waiting for event.");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id(), 99);
     }
 }

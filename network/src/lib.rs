@@ -27,6 +27,13 @@ pub type Events = linux_poll::epoll::Events;
 
 pub type Token = usize;
 
+#[macro_export]
+macro_rules! cvt {
+    ($libc_call: expr) => {
+        cvt::cvt(unsafe { $libc_call })
+    };
+}
+
 /// `Poll` represents the event queue. The `poll` method will block the current thread
 /// waiting for events. If no timeout is provided it will potentially block indefinately.
 ///
@@ -189,7 +196,7 @@ mod tests {
                 loop {
                     println!("waiting {:?}", poll);
                     match poll.poll(&mut events, Some(Duration::from_millis(100))) {
-                        Ok(..) => (),
+                        Ok(n) => println!("recv {n} events"),
                         Err(ref e) if e.kind() == io::ErrorKind::Interrupted => break,
                         Err(e) => panic!("Poll error: {:?}, {}", e.kind(), e),
                     };

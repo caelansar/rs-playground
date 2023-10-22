@@ -1,8 +1,7 @@
-use crate::{EventID, Events, Interests, TcpStream, Token};
+use crate::{cvt, EventID, Events, Interests, TcpStream, Token};
 use libc::{self, c_void};
 use std::cmp;
-use std::io::{self, IoSliceMut, Read, Write};
-use std::net;
+use std::io::{self, Read, Write};
 use std::os::raw::{c_int, c_short};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
@@ -42,13 +41,6 @@ impl Zero for KeventList {
         }]
     }
 }
-
-macro_rules! cvt {
-    ($libc_call: expr) => {
-        cvt::cvt(unsafe { $libc_call })
-    };
-}
-
 macro_rules! kevent {
     ($id: expr, $filter: expr, $flags: expr, $data: expr) => {
         libc::kevent {
