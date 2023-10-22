@@ -71,8 +71,13 @@ impl Selector {
         timeout_ms: Option<time::Duration>,
     ) -> io::Result<()> {
         events.clear();
-        let timeout = timeout_ms.unwrap_or(time::Duration::from_millis(100));
-        epoll_wait(self.fd, events, 1024, timeout.as_millis() as i32).map(|n_events| {
+        epoll_wait(
+            self.fd,
+            events,
+            1024,
+            timeout_ms.map_or(-1, |x| x.as_millis() as i32),
+        )
+        .map(|n_events| {
             // This is safe because `syscall_kevent` ensures that `n_events` are
             // assigned. We could check for a valid token for each event to verify so this is
             // just a performance optimization used in `mio` and copied here.
