@@ -41,3 +41,7 @@ pub(crate) fn epoll_wait(
         timeout
     ))
 }
+
+pub(crate) fn eventfd(init: u32, flag: i32) -> io::Result<i32> {
+    cvt!(libc::eventfd(init, flag))
+}

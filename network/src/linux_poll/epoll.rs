@@ -1,4 +1,4 @@
-use super::ffi::{close_fd, epoll_create, epoll_ctl, epoll_wait};
+use super::ffi::{close_fd, epoll_create, epoll_ctl, epoll_wait, eventfd};
 use crate::{EventID, Interests, TcpStream, Token};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
@@ -47,6 +47,27 @@ impl Registrator {
 
     pub fn deregister(&self, stream: &TcpStream) -> io::Result<()> {
         println!("unimplemented!");
+        Ok(())
+    }
+
+    pub fn close_loop(&self) -> io::Result<()> {
+        if self
+            .is_poll_dead
+            .compare_and_swap(false, true, Ordering::SeqCst)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "Poll instance closed.",
+            ));
+        }
+
+        let wake_fd = eventfd(1, 0)?;
+        let mut event = libc::epoll_event {
+            events: libc::EPOLLIN as u32,
+            u64: 0,
+        };
+        epoll_ctl(self.fd, libc::EPOLL_CTL_ADD, wake_fd, &mut event)?;
+
         Ok(())
     }
 }

@@ -240,14 +240,17 @@ mod tests {
             .register(&socket, 99, Interests::READABLE)
             .unwrap();
 
-        thread::spawn(move || {
-            while let Ok(token) = receiver.recv() {
-                println!("receive token");
-                assert_eq!(99, token);
-                registrator.deregister(&socket).unwrap();
-            }
-        });
+        thread::Builder::new()
+            .name("wait".to_string())
+            .spawn(move || {
+                sleep(Duration::from_millis(1000));
+                registrator.close_loop().unwrap();
+            })
+            .unwrap();
 
-        sleep(Duration::from_millis(1000));
+        while let Ok(token) = receiver.recv() {
+            println!("receive token");
+            assert_eq!(99, token);
+        }
     }
 }
