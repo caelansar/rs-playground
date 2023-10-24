@@ -8,6 +8,7 @@ use std::sync::{
 use std::{io, time};
 
 const READ_FLAG: i32 = libc::EPOLLIN | libc::EPOLLONESHOT;
+const WRITE_FLAG: i32 = libc::EPOLLOUT | libc::EPOLLONESHOT;
 
 pub type Events = Vec<libc::epoll_event>;
 
@@ -39,7 +40,11 @@ impl Registrator {
         };
 
         if interests.is_writable() {
-            unimplemented!();
+            let mut event = libc::epoll_event {
+                events: WRITE_FLAG as u32,
+                u64: token as u64,
+            };
+            epoll_ctl(self.fd, libc::EPOLL_CTL_ADD, fd, &mut event)?;
         }
 
         Ok(())
@@ -156,7 +161,7 @@ mod tests {
             .register(&sock, 99, Interests::READABLE)
             .unwrap();
 
-        let mut events = Events::with_capacity(16);
+        let mut events = Events::with_capacity(1024);
 
         selector
             .select(&mut events, None)
@@ -164,5 +169,35 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].id(), 99);
+    }
+
+    #[test]
+    fn test_write() {
+        let selector = Selector::new().unwrap();
+        let mut sock: TcpStream = TcpStream::connect("www.baidu.com:80").unwrap();
+
+        let poll_is_dead = Arc::new(AtomicBool::new(false));
+        let registrator = selector.registrator(poll_is_dead);
+
+        registrator
+            .register(&sock, 99, Interests::WRITABLE)
+            .unwrap();
+
+        let mut events = Events::with_capacity(1024);
+
+        selector
+            .select(&mut events, None)
+            .expect("waiting for event.");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id(), 99);
+
+        // sock is writable
+        let request = "GET / HTTP/1.1\r\n\
+                       Host: www.baidu.com\r\n\
+                       Connection: close\r\n\
+                       \r\n";
+        sock.write_all(request.as_bytes())
+            .expect("Error writing to stream");
     }
 }
