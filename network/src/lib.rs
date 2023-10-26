@@ -181,7 +181,7 @@ mod tests {
     use crate::{EventID, Events, Interests, Poll, Registrator, TcpStream};
 
     struct Reactor {
-        handle: JoinHandle<()>,
+        handle: Option<JoinHandle<()>>,
         register: Option<Registrator>,
     }
 
@@ -211,13 +211,19 @@ mod tests {
             });
 
             Reactor {
-                handle,
+                handle: Some(handle),
                 register: Some(registrator),
             }
         }
 
         fn registrator(&mut self) -> Registrator {
             self.register.take().unwrap()
+        }
+    }
+
+    impl Drop for Reactor {
+        fn drop(&mut self) {
+            self.handle.take().map(|h| h.join().unwrap());
         }
     }
 
