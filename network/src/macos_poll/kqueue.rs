@@ -1,15 +1,17 @@
-use crate::{cvt, EventID, Events, Interests, TcpStream, Token};
+use crate::{EventID, Events, Interests, TcpStream, Token};
 use libc::{self, c_void};
 use std::cmp;
 use std::io::{self, Read, Write};
 use std::os::raw::{c_int, c_short};
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::AsRawFd;
 use std::ptr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use std::time::Duration;
+
+use super::ffi::{close, kevent, kqueue};
 
 pub type Source = std::os::unix::io::RawFd;
 
@@ -78,27 +80,27 @@ impl Registrator {
             let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
             let changes = [kevent!(fd, libc::EVFILT_READ, flags, token)];
 
-            cvt!(libc::kevent(
+            kevent(
                 self.kq,
                 changes.as_ptr(),
                 changes.len() as Count,
                 [].as_mut_ptr(),
                 0,
                 std::ptr::null(),
-            ))?;
+            )?;
         };
 
         if interests.is_writable() {
             let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_ONESHOT;
             let changes = [kevent!(fd, libc::EVFILT_WRITE, flags, token)];
-            cvt!(libc::kevent(
+            kevent(
                 self.kq,
                 changes.as_ptr(),
                 changes.len() as Count,
                 [].as_mut_ptr(),
                 0,
                 std::ptr::null(),
-            ))?;
+            )?;
         }
 
         Ok(())
@@ -112,14 +114,14 @@ impl Registrator {
             kevent!(fd, libc::EVFILT_READ, flags, ptr::null_mut()),
             kevent!(fd, libc::EVFILT_WRITE, flags, ptr::null_mut()),
         ];
-        cvt!(libc::kevent(
+        kevent(
             self.kq,
             changes.as_ptr(),
             changes.len() as c_int,
             changes.as_mut_ptr(),
             changes.len() as c_int,
-            ::std::ptr::null()
-        ))?;
+            ::std::ptr::null(),
+        )?;
         Ok(())
     }
 
@@ -137,14 +139,14 @@ impl Registrator {
         let flags = libc::EV_ADD | libc::EV_ENABLE | libc::EV_CLEAR;
         let changes = [kevent!(0, libc::EVFILT_TIMER, flags, 0)];
 
-        cvt!(libc::kevent(
+        kevent(
             self.kq,
             changes.as_ptr(),
             changes.len() as Count,
             [].as_mut_ptr(),
             0,
             std::ptr::null(),
-        ))?;
+        )?;
 
         Ok(())
     }
@@ -158,7 +160,7 @@ pub struct Selector {
 impl Selector {
     pub fn new() -> io::Result<Self> {
         Ok(Selector {
-            kq: cvt!(libc::kqueue()).unwrap(),
+            kq: kqueue().unwrap(),
         })
     }
 
@@ -176,14 +178,14 @@ impl Selector {
         let n_events = events.capacity() as c_int;
         events.clear();
 
-        let cnt = cvt!(libc::kevent(
+        let cnt = kevent(
             self.kq,
             ptr::null(),
             0,
             events.as_mut_ptr(),
             n_events,
             timeout,
-        ))?;
+        )?;
         unsafe { events.set_len(cnt as usize) };
         Ok(())
     }
@@ -206,15 +208,6 @@ impl Drop for Selector {
                 }
             }
         }
-    }
-}
-
-pub fn close(fd: RawFd) -> io::Result<()> {
-    let res = unsafe { super::ffi::close(fd) };
-    if res < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
     }
 }
 
