@@ -1,6 +1,8 @@
 #![feature(test)]
 #![allow(dead_code)]
 
+mod byteorder;
+
 extern crate test;
 
 use std::{fmt::Debug, marker::PhantomData};
