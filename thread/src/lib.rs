@@ -180,4 +180,15 @@ mod tests {
 
         assert_eq!(a, 0);
     }
+
+    #[test]
+    fn test_panic_thread() {
+        let h1 = thread::spawn(|| {
+            panic!("panic in thread")
+        });
+
+        println!("main thread");
+        let r = h1.join();
+        assert!(r.is_err());
+    }
 }
