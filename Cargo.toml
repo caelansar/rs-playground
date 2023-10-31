@@ -28,5 +28,6 @@ members = [
     "function",
     "wait_group",
     "hash",
-    "ffi"
+    "ffi",
+    "vec"
 ]
