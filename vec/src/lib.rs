@@ -1,4 +1,4 @@
-use std::alloc::{alloc, realloc, Layout, handle_alloc_error};
+use std::alloc::{alloc, handle_alloc_error, realloc, Layout};
 use std::ptr;
 use std::ptr::NonNull;
 
@@ -57,9 +57,7 @@ impl<T> Vec<T> {
             None
         } else {
             self.len -= 1;
-            unsafe  {
-                Some(ptr::read(self.ptr.as_ptr().add(self.len)))
-            }
+            unsafe { Some(ptr::read(self.ptr.as_ptr().add(self.len))) }
         }
     }
 }
