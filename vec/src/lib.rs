@@ -1,6 +1,7 @@
-use std::alloc::{alloc, handle_alloc_error, realloc, Layout};
-use std::ptr;
+use std::alloc::{alloc, dealloc, handle_alloc_error, realloc, Layout};
+use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
+use std::{ptr, slice};
 
 pub struct Vec<T> {
     ptr: NonNull<T>,
@@ -62,6 +63,32 @@ impl<T> Vec<T> {
     }
 }
 
+impl<T> Drop for Vec<T> {
+    fn drop(&mut self) {
+        if self.cap == 0 {
+            return;
+        }
+        while let Some(_) = self.pop() {}
+
+        let layout = Layout::array::<T>(self.cap).unwrap();
+        unsafe { dealloc(self.ptr.as_ptr() as *mut u8, layout) }
+    }
+}
+
+impl<T> Deref for Vec<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+    }
+}
+
+impl<T> DerefMut for Vec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Vec as MyVec;
@@ -72,5 +99,16 @@ mod tests {
         vec.push(1);
         assert_eq!(Some(1), vec.pop());
         assert_eq!(None, vec.pop());
+    }
+
+    #[test]
+    fn vec_deref_works() {
+        let mut vec = MyVec::new();
+        vec.push(1);
+        vec.push(2);
+        vec.push(3);
+
+        let rv = vec.iter().map(|x| *x).collect::<Vec<i32>>();
+        assert_eq!(rv, vec![1, 2, 3]);
     }
 }
