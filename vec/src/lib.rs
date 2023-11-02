@@ -61,6 +61,38 @@ impl<T> Vec<T> {
             unsafe { Some(ptr::read(self.ptr.as_ptr().add(self.len))) }
         }
     }
+
+    pub fn insert(&mut self, elem: T, idx: usize) {
+        assert!(idx <= self.len);
+        if self.cap == self.len {
+            self.grow();
+        }
+        unsafe {
+            ptr::copy(
+                self.ptr.as_ptr().add(idx),
+                self.ptr.as_ptr().add(idx + 1),
+                self.len - idx,
+            );
+            ptr::write(self.ptr.as_ptr().add(idx), elem);
+        }
+        self.len += 1;
+    }
+
+    pub fn remove(&mut self, idx: usize) -> Option<T> {
+        assert!(idx <= self.len);
+
+        self.len -= 1;
+
+        unsafe {
+            let rv = unsafe { Some(ptr::read(self.ptr.as_ptr().add(idx))) };
+            ptr::copy(
+                self.ptr.as_ptr().add(idx + 1),
+                self.ptr.as_ptr().add(idx),
+                self.len - idx,
+            );
+            rv
+        }
+    }
 }
 
 impl<T> Drop for Vec<T> {
@@ -108,6 +140,22 @@ mod tests {
         vec.push(2);
         vec.push(3);
 
+        let rv = vec.iter().map(|x| *x).collect::<Vec<i32>>();
+        assert_eq!(rv, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn vec_insert_remove_works() {
+        let mut vec = MyVec::new();
+        vec.push(1);
+        vec.push(2);
+        vec.push(3);
+
+        vec.insert(0, 0);
+        let rv = vec.iter().map(|x| *x).collect::<Vec<i32>>();
+        assert_eq!(rv, vec![0, 1, 2, 3]);
+
+        vec.remove(0);
         let rv = vec.iter().map(|x| *x).collect::<Vec<i32>>();
         assert_eq!(rv, vec![1, 2, 3]);
     }
