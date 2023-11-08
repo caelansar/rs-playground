@@ -1,7 +1,8 @@
 use std::alloc::{alloc, dealloc, handle_alloc_error, realloc, Layout};
+use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
-use std::{ptr, slice};
+use std::{mem, ptr, slice};
 
 pub struct Vec<T> {
     ptr: NonNull<T>,
@@ -121,6 +122,70 @@ impl<T> DerefMut for Vec<T> {
     }
 }
 
+impl<T> IntoIterator for Vec<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+    fn into_iter(self) -> IntoIter<T> {
+        let vec = ManuallyDrop::new(self);
+
+        let ptr = vec.ptr;
+        let cap = vec.cap;
+        let len = vec.len;
+
+        unsafe {
+            IntoIter {
+                buf: ptr,
+                cap,
+                start: ptr.as_ptr(),
+                end: if cap == 0 {
+                    ptr.as_ptr()
+                } else {
+                    ptr.as_ptr().add(len)
+                },
+            }
+        }
+    }
+}
+
+pub struct IntoIter<T> {
+    buf: NonNull<T>,
+    cap: usize,
+    start: *const T,
+    end: *const T,
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        if self.start == self.end {
+            None
+        } else {
+            unsafe {
+                let result = ptr::read(self.start);
+                self.start = self.start.offset(1);
+                Some(result)
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = (self.end as usize - self.start as usize) / mem::size_of::<T>();
+        (len, Some(len))
+    }
+}
+
+impl<T> Drop for IntoIter<T> {
+    fn drop(&mut self) {
+        if self.cap != 0 {
+            for _ in &mut *self {}
+            let layout = Layout::array::<T>(self.cap).unwrap();
+            unsafe {
+                dealloc(self.buf.as_ptr() as *mut u8, layout);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Vec as MyVec;
@@ -157,6 +222,17 @@ mod tests {
 
         vec.remove(0);
         let rv = vec.iter().map(|x| *x).collect::<Vec<i32>>();
+        assert_eq!(rv, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn vec_into_iter_works() {
+        let mut vec = MyVec::new();
+        vec.push(1);
+        vec.push(2);
+        vec.push(3);
+
+        let rv = vec.into_iter().map(|x| x).collect::<Vec<i32>>();
         assert_eq!(rv, vec![1, 2, 3]);
     }
 }
