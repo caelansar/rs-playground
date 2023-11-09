@@ -29,5 +29,6 @@ members = [
     "wait_group",
     "hash",
     "ffi",
-    "vec"
+    "vec",
+    "dropck"
 ]
