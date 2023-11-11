@@ -29,6 +29,29 @@ mod tests {
     }
 
     #[test]
+    fn function_pointer_should_be_equal() {
+        let foo_pointer: fn(i32) -> i32 = foo;
+        let bar_pointer: fn(i32) -> i32 = bar;
+
+        // Printing the memory addresses of the function pointers
+        println!("Address of foo pointer: {:p}", foo_pointer as *const ());
+        println!("Address of bar pointer: {:p}", bar_pointer as *const ());
+
+        // Casting function items to function pointers and printing
+        println!(
+            "Address of foo via cast: {:p}",
+            foo as fn(i32) -> i32 as *const ()
+        );
+        println!(
+            "Address of bar via cast: {:p}",
+            bar as fn(i32) -> i32 as *const ()
+        );
+
+        assert_eq!(foo as fn(i32) -> i32 as *const (), foo_pointer as *const ());
+        assert_eq!(bar as fn(i32) -> i32 as *const (), bar_pointer as *const ());
+    }
+
+    #[test]
     fn test_function_pointer() {
         let mut x: fn(i32) -> i32 = foo; // coercion
         println!("{}", type_name_of_val(&x));
