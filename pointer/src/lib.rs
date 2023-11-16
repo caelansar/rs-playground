@@ -268,4 +268,34 @@ mod tests {
     //     // undefined behavior
     //     assert_ne!(*ref1, 1);
     // }
+
+    struct Struct {
+        inner: i8,
+    }
+
+    #[test]
+    // Rust             C/C++
+    // a: &T         == const T* const a; // can't mutate either
+    // mut a: &T     == const T* a;       // can't mutate what is pointed to
+    // a: &mut T     == T* const a;       // can't mutate pointer
+    // mut a: &mut T == T* a;             // can mutate both
+    fn test_mut_ref() {
+        let mut s = Struct { inner: 1 };
+        let mut s1 = Struct { inner: 4 };
+
+        let ref_1 = &mut s;
+        ref_1.inner = 100;
+        // ref_1 = &mut s1; // cannot assign twice to immutable variable `ref_1`
+        assert_eq!(ref_1.inner, 100);
+
+        let mut ref_2 = &s;
+        // ref_2.inner = 100; // cannot assign to `ref_2.inner`, which is behind a `&` reference
+        ref_2 = &s1;
+        assert_eq!(ref_2.inner, 4);
+
+        let mut ref_3 = &mut s;
+        ref_3.inner = 100;
+        ref_3 = &mut s1;
+        assert_eq!(ref_3.inner, 4);
+    }
 }
