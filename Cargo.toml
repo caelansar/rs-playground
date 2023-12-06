@@ -30,5 +30,6 @@ members = [
     "hash",
     "ffi",
     "vec",
-    "dropck"
+    "dropck",
+    "io"
 ]
