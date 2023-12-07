@@ -31,5 +31,6 @@ members = [
     "ffi",
     "vec",
     "dropck",
-    "io"
+    "io",
+    "iter"
 ]
