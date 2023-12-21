@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libc = "0.2.139"
-cvt = "0.1.1"
+libc = "0.2.149"
+cvt = "0.1.2"
 
 [dev-dependencies]
 anyhow = "1"
