@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.5.17", features = ["headers"] }
+axum = { version = "0.7"}
 mime = "0.3.16"
 accept-header = "0.2.3"
 anyhow = "1.0"
@@ -22,7 +22,7 @@ reqwest = { version = "0.11.13", default-features = false, features = ["json", "
 serde = { version = "1.0.147", features = ["derive"] }
 tokio = { version = "1.20.0", features = ["full"] }
 tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] }
-tower-http = { version = "0.1", features = ["add-extension", "compression-full", "trace" ] }
+tower-http = { version = "0.5", features = ["add-extension", "compression-full", "trace" ] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
 

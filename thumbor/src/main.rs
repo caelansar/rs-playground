@@ -1,11 +1,12 @@
 use accept_header::Accept;
 use anyhow::Result;
+use axum::handler::HandlerWithoutStateExt;
 use axum::{
     extract::Path,
     http::header::ACCEPT,
     http::{HeaderMap, HeaderValue, StatusCode},
     routing::get,
-    Extension, Router, Server,
+    serve, Extension, Router,
 };
 use bytes::Bytes;
 use image::ImageOutputFormat;
@@ -20,10 +21,11 @@ use std::{
     num::NonZeroUsize,
     sync::Arc,
 };
+use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tower::ServiceBuilder;
 use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
-use tracing::{debug, info};
+use tracing::info;
 
 mod engine;
 mod pb;
@@ -55,11 +57,9 @@ async fn main() {
                 .layer(AddExtensionLayer::new(cache)),
         );
 
-    let addr = "127.0.0.1:5001".parse().unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
-    debug!("listening on {}", addr);
-
-    let server = Server::bind(&addr).serve(app.into_make_service());
+    let server = serve(listener, app.into_make_service());
 
     if let Err(err) = server.await {
         eprintln!("server error: {}", err);
