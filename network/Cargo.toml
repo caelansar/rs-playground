@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 libc = "0.2.149"
 cvt = "0.1.2"
+ip_network = "0.4.1"
+ip_network_table = "0.2.0"
 
 [dev-dependencies]
 anyhow = "1"
