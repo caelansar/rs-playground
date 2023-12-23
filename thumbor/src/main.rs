@@ -57,7 +57,7 @@ async fn main() {
                 .layer(AddExtensionLayer::new(cache)),
         );
 
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:5001").await.unwrap();
 
     let server = serve(listener, app.into_make_service());
 
