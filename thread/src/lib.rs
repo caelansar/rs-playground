@@ -1,3 +1,6 @@
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 
 fn thread_spawn() {
@@ -14,6 +17,22 @@ fn thread_scope() {
         s.spawn(|| println!("hello1 {}", name));
         s.spawn(|| println!("hello2 {}", name));
     });
+}
+
+#[derive(Clone)]
+pub struct SharedReceiver<T>(Arc<Mutex<Receiver<T>>>);
+
+pub fn shared_channel<T>() -> (Sender<T>, SharedReceiver<T>) {
+    let (send, recv) = channel();
+    (send, SharedReceiver(Arc::new(Mutex::new(recv))))
+}
+
+impl<T> Iterator for SharedReceiver<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.lock().map(|x| x.recv().ok()).unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -188,5 +207,39 @@ mod tests {
         println!("main thread");
         let r = h1.join();
         assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_shared_receiver() {
+        let (tx, mut rx) = shared_channel();
+
+        let tx1 = tx.clone();
+        let tx2 = tx.clone();
+
+        let mut rx1 = rx.clone();
+
+        let h1 = thread::spawn(move || {
+            tx.send(1).unwrap();
+        });
+        let h2 = thread::spawn(move || {
+            tx1.send(2).unwrap();
+        });
+        let h3 = thread::spawn(move || {
+            tx2.send(3).unwrap();
+        });
+        let h4 = thread::spawn(move || {
+            println!("rx {:?}", rx.next());
+            println!("rx {:?}", rx.next());
+        });
+        let h5 = thread::spawn(move || {
+            println!("rx1 {:?}", rx1.next());
+            println!("rx1 {:?}", rx1.next());
+        });
+
+        h1.join().unwrap();
+        h2.join().unwrap();
+        h3.join().unwrap();
+        h4.join().unwrap();
+        h5.join().unwrap();
     }
 }
