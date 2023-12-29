@@ -1,4 +1,5 @@
 use futures::Future;
+use std::io::Write;
 
 pub trait KvIterator {
     type Next<'a>: Future<Output = Option<(&'a str, &'a str)>>
@@ -11,6 +12,20 @@ pub trait KvIterator {
 pub struct TestIterator {
     idx: usize,
     max: usize,
+    key: Vec<u8>,
+    value: Vec<u8>,
+}
+
+#[allow(dead_code)]
+impl TestIterator {
+    pub fn new(idx: usize, max: usize) -> Self {
+        Self {
+            idx,
+            max,
+            key: Vec::new(),
+            value: Vec::new(),
+        }
+    }
 }
 
 impl KvIterator for TestIterator {
@@ -22,7 +37,22 @@ impl KvIterator for TestIterator {
             if self.idx > self.max {
                 return None;
             }
-            Some(("k", "v"))
+
+            // manipulate the keys and values without repeatedly allocating and deallocating memory
+            // for them, instead reusing the same allocated space as much as possible
+
+            self.key.clear();
+            write!(&mut self.key, "key_{}", self.idx).unwrap();
+
+            self.value.clear();
+            write!(&mut self.value, "value_{}", self.idx).unwrap();
+
+            unsafe {
+                Some((
+                    std::str::from_utf8_unchecked(&self.key[..]),
+                    std::str::from_utf8_unchecked(&self.value[..]),
+                ))
+            }
         }
     }
 }
@@ -40,7 +70,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_async_trait() {
-        let iter = TestIterator { idx: 0, max: 5 };
+        let iter = TestIterator::new(0, 5);
 
         iterator(iter).await;
     }
