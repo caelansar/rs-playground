@@ -64,4 +64,22 @@ mod tests {
         wg.wait();
         println!("all done");
     }
+
+    #[test]
+    fn test_crossbeam_wait_group() {
+        use crossbeam_utils::sync::WaitGroup as WaitGroup1;
+        use std::thread;
+        let wg = WaitGroup1::new();
+
+        for i in 0..5 {
+            let wg = wg.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_secs(2));
+                println!("task {} done", i);
+                drop(wg);
+            });
+        }
+        wg.wait();
+        println!("all done");
+    }
 }
