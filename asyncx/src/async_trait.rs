@@ -3,11 +3,11 @@ use futures::Future;
 use std::io::Write;
 
 pub trait KvIterator {
-    type Next<'a>: Future<Output = Option<(&'a str, &'a str)>>
+    type Item<'a>
     where
         Self: 'a;
 
-    fn next(&mut self) -> Self::Next<'_>;
+    fn next(&mut self) -> impl Future<Output = Option<Self::Item<'_>>>;
 }
 
 pub trait AsyncKvIterator {
@@ -37,9 +37,9 @@ impl TestIterator {
 }
 
 impl KvIterator for TestIterator {
-    type Next<'a> = impl Future<Output = Option<(&'a str, &'a str)>>;
+    type Item<'a> = (&'a str, &'a str);
 
-    fn next(&mut self) -> Self::Next<'_> {
+    fn next(&mut self) -> impl Future<Output = Option<Self::Item<'_>>> {
         async move {
             self.idx += 1;
             if self.idx > self.max {
@@ -93,7 +93,7 @@ impl AsyncKvIterator for TestIterator {
 }
 
 #[allow(dead_code)]
-async fn iterator(mut iter: impl KvIterator) {
+async fn iterator(mut iter: impl for<'a> KvIterator<Item<'a> = (&'a str, &'a str)> + 'static) {
     while let Some(data) = iter.next().await {
         println!("key: {}, value: {}", data.0, data.1);
     }
