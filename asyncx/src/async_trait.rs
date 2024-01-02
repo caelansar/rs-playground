@@ -108,7 +108,7 @@ async fn native_iterator(
     }
 }
 
-async fn native_iterator1<A: AsyncKvIterator + 'static>(mut iter: A)
+async fn native_iterator1<A: AsyncKvIterator>(mut iter: A)
 where
     for<'a> <A as AsyncKvIterator>::Item<'a>: Debug,
 {
