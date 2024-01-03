@@ -35,11 +35,41 @@ impl<T> Iterator for SharedReceiver<T> {
     }
 }
 
+fn partition<T: PartialOrd + Send>(v: &mut [T]) -> usize {
+    let pivot = v.len() - 1;
+    let mut i = 0;
+    for j in 0..pivot {
+        if v[j] <= v[pivot] {
+            v.swap(i, j);
+            i += 1;
+        }
+    }
+    v.swap(i, pivot);
+    i
+}
+
+fn quick_sort_rayon<T: PartialOrd + Send>(v: &mut [T]) {
+    if v.len() > 1 {
+        let mid = partition(v);
+        let (lo, hi) = v.split_at_mut(mid);
+        rayon::join(|| quick_sort(lo), || quick_sort(hi));
+    }
+}
+
+fn quick_sort<T: PartialOrd + Send>(v: &mut [T]) {
+    if v.len() > 1 {
+        let mid = partition(v);
+        let (lo, hi) = v.split_at_mut(mid);
+        quick_sort(lo);
+        quick_sort(hi);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
         sync::{Arc, Mutex},
-        time::Duration,
+        time::{Duration, Instant},
     };
 
     use super::*;
@@ -265,5 +295,34 @@ mod tests {
         for handle in handles {
             handle.join().unwrap();
         }
+    }
+
+    #[test]
+    fn test_rayon_sort() {
+        let mut v: Vec<u32> = (1..=10000).into_iter().collect();
+        let mut v1 = v.clone();
+        v1.swap(11, 45);
+        v1.swap(53, 9438);
+        v1.swap(49, 898);
+        v1.swap(1, 4);
+
+        let start = Instant::now();
+        quick_sort(&mut v1);
+        println!("{:?}", start.elapsed());
+
+        assert_eq!(v1, v);
+
+        let mut v: Vec<u32> = (1..=10000).into_iter().collect();
+        let mut v1 = v.clone();
+        v1.swap(11, 45);
+        v1.swap(53, 9438);
+        v1.swap(49, 898);
+        v1.swap(1, 4);
+
+        let start = Instant::now();
+        quick_sort_rayon(&mut v1);
+        println!("{:?}", start.elapsed());
+
+        assert_eq!(v1, v);
     }
 }
