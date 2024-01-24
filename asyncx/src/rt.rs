@@ -4,7 +4,7 @@ use std::future::Future;
 use std::mem::{forget, ManuallyDrop};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Context, RawWaker, RawWakerVTable, Waker};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::thread;
 
 struct Runtime {
@@ -46,6 +46,59 @@ impl Task {
             executor: sender.clone(),
         });
         let _ = sender.send(task);
+    }
+
+    fn spawn_blocking<T, F>(closure: F) -> SpawnBlocking<T>
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send + 'static,
+    {
+        let inner = Arc::new(Mutex::new(Shared {
+            val: None,
+            waker: None,
+        }));
+
+        thread::spawn({
+            let inner = inner.clone();
+
+            move || {
+                let val = closure();
+
+                let maybe_waker = {
+                    let mut guard = inner.lock().unwrap();
+                    guard.val = Some(val);
+                    guard.waker.take()
+                };
+
+                if let Some(waker) = maybe_waker {
+                    waker.wake()
+                }
+            }
+        });
+
+        SpawnBlocking(inner)
+    }
+}
+
+struct SpawnBlocking<T>(Arc<Mutex<Shared<T>>>);
+
+struct Shared<T> {
+    val: Option<T>,
+    waker: Option<Waker>,
+}
+
+impl<T> Future for SpawnBlocking<T> {
+    type Output = T;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut guard = self.0.lock().unwrap();
+        if let Some(val) = guard.val.take() {
+            return Poll::Ready(val);
+        }
+
+        guard.waker = Some(cx.waker().clone());
+        Poll::Pending
     }
 }
 
@@ -120,15 +173,46 @@ mod tests {
 
     use crate::delay::Delay;
 
-    use super::Runtime;
+    use super::{Runtime, Task};
 
     #[test]
-    fn test_runtime() {
+    fn test_spawn() {
         let mut rt = Runtime::new();
 
         rt.spawn(async {
             let fut = Delay::new(Instant::now() + Duration::from_secs(2));
             fut.await;
+        });
+
+        rt.run();
+        sleep(Duration::from_secs(3))
+    }
+
+    #[test]
+    fn test_spawn_blocking() {
+        let mut rt = Runtime::new();
+
+        let fut1 = Task::spawn_blocking(|| {
+            sleep(Duration::from_secs(2));
+            1
+        });
+
+        let fut2 = Task::spawn_blocking(|| {
+            sleep(Duration::from_secs(2));
+            2
+        });
+
+        let fut3 = Task::spawn_blocking(|| {
+            sleep(Duration::from_secs(2));
+            3
+        });
+
+        rt.spawn(async {
+            let v1 = fut1.await;
+            let v2 = fut2.await;
+            let v3 = fut3.await;
+
+            assert_eq!((1, 2, 3), (v1, v2, v3));
         });
 
         rt.run();
