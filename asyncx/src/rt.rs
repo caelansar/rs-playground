@@ -1,8 +1,9 @@
 use crossbeam::channel;
+use crossbeam::sync::Parker;
 use futures::task::ArcWake;
 use std::future::Future;
 use std::mem::{forget, ManuallyDrop};
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::thread;
@@ -48,6 +49,7 @@ impl Task {
         let _ = sender.send(task);
     }
 
+    /// Spawns a blocking task.
     fn spawn_blocking<T, F>(closure: F) -> SpawnBlocking<T>
     where
         F: FnOnce() -> T,
@@ -78,6 +80,27 @@ impl Task {
         });
 
         SpawnBlocking(inner)
+    }
+
+    /// Spawns a task and blocks the current thread on its result.
+    fn block_on<F: Future>(future: F) -> F::Output {
+        let parker = Parker::new();
+        let unparker = parker.unparker().clone();
+
+        let waker = waker_fn(move || {
+            unparker.unpark();
+        });
+
+        let mut cx = Context::from_waker(&waker);
+
+        let mut future = pin!(future);
+
+        loop {
+            match future.as_mut().poll(&mut cx) {
+                Poll::Ready(v) => return v,
+                Poll::Pending => parker.park(),
+            }
+        }
     }
 }
 
@@ -190,8 +213,6 @@ mod tests {
 
     #[test]
     fn test_spawn_blocking() {
-        let mut rt = Runtime::new();
-
         let fut1 = Task::spawn_blocking(|| {
             sleep(Duration::from_secs(2));
             1
@@ -207,15 +228,13 @@ mod tests {
             3
         });
 
-        rt.spawn(async {
+        Task::block_on(async {
             let v1 = fut1.await;
             let v2 = fut2.await;
             let v3 = fut3.await;
 
+            println!("{v1} {v2} {v3}");
             assert_eq!((1, 2, 3), (v1, v2, v3));
         });
-
-        rt.run();
-        sleep(Duration::from_secs(3))
     }
 }
