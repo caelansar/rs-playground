@@ -1,6 +1,5 @@
 use accept_header::Accept;
 use anyhow::Result;
-use axum::handler::HandlerWithoutStateExt;
 use axum::{
     extract::Path,
     http::header::ACCEPT,
