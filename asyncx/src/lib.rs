@@ -2,8 +2,11 @@
 #![feature(string_leak)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(associated_type_defaults)]
+#![feature(async_iterator)]
+#![feature(async_for_loop)]
 
 mod async_fn;
+mod async_iter;
 mod async_trait;
 mod cancel_decorator;
 mod delay;
@@ -235,7 +238,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn select_sould_works() {
+    async fn select_should_works() {
         tokio::select! {
             res = run_server() => {
                 if let Err(err) = res {
