@@ -27,11 +27,10 @@ impl<T> List<T> {
     /// Removes the first element from a `List<T>` and returns it, or [`None`] if it
     /// is empty.
     pub fn pop(&mut self) -> Option<T> {
-        let node = self.head.take().map(|n| {
+        self.head.take().map(|n| {
             self.head = n.next;
             n.elem
-        });
-        node
+        })
     }
 
     /// Returns a reference to the element in the head of `List<T>`
