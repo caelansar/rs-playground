@@ -12,6 +12,7 @@ mod cancel_decorator;
 mod delay;
 mod line_stream;
 mod rt;
+mod stream_map;
 mod time_decorator;
 
 use std::{
