@@ -34,5 +34,6 @@ members = [
     "dropck",
     "io",
     "iter",
-    "parser"
+    "parser",
+    "chat"
 ]
