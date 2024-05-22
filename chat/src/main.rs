@@ -42,6 +42,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(State::default());
 
     loop {
+        letff = 1;
         let (stream, addr) = listener.accept().await?;
         info!("Accepted connection from: {}", addr);
         let state_cloned = state.clone();

@@ -1,4 +1,5 @@
 mod mutex_poison;
+mod thread_pool;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -73,6 +74,7 @@ mod tests {
         sync::{Arc, Mutex},
         time::{Duration, Instant},
     };
+    use std::thread::sleep;
 
     use super::*;
 
@@ -326,5 +328,19 @@ mod tests {
         println!("{:?}", start.elapsed());
 
         assert_eq!(v1, v);
+    }
+
+    #[test]
+    fn test_thread_pool() {
+        let pool = crate::thread_pool::ThreadPool::new("worker", 4);
+
+        pool.execute(|| {
+            println!("task1");
+        }).unwrap();
+        pool.execute(|| {
+            println!("task2");
+        }).unwrap();
+
+        sleep(Duration::from_secs(2));
     }
 }

@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 loom = "0.7.0"
 rayon = "1.8.0"
+anyhow = "1"
+crossbeam-channel = "0.5.8"
