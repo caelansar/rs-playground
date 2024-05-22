@@ -3,7 +3,7 @@ use crossbeam_channel as mpsc;
 use std::{
     mem,
     sync::{Arc, Mutex},
-    thread::self,
+    thread,
 };
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
@@ -47,8 +47,8 @@ impl ThreadPool {
     }
 
     pub fn execute<F>(&self, f: F) -> Result<()>
-        where
-            F: FnOnce() + Send + 'static,
+    where
+        F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
         let Some(ref sender) = self.sender else {

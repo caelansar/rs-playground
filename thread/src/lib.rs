@@ -70,11 +70,11 @@ fn quick_sort<T: PartialOrd + Send>(v: &mut [T]) {
 
 #[cfg(test)]
 mod tests {
+    use std::thread::sleep;
     use std::{
         sync::{Arc, Mutex},
         time::{Duration, Instant},
     };
-    use std::thread::sleep;
 
     use super::*;
 
@@ -336,10 +336,12 @@ mod tests {
 
         pool.execute(|| {
             println!("task1");
-        }).unwrap();
+        })
+        .unwrap();
         pool.execute(|| {
             println!("task2");
-        }).unwrap();
+        })
+        .unwrap();
 
         sleep(Duration::from_secs(2));
     }
