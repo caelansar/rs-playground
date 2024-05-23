@@ -11,6 +11,7 @@ mod async_trait;
 mod cancel_decorator;
 mod delay;
 mod line_stream;
+mod proxy;
 mod recursion;
 mod rt;
 mod stream_map;
