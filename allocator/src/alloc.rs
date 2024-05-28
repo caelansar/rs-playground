@@ -1,3 +1,4 @@
+use crate::logger::log_dealloc;
 use std::alloc::{GlobalAlloc, Layout};
 use std::cell::UnsafeCell;
 use std::ptr::null_mut;
@@ -5,6 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
 const ARENA_SIZE: usize = 128 * 1024;
 const MAX_SUPPORTED_ALIGN: usize = 4096;
+
 #[repr(C, align(4096))] // 4096 == MAX_SUPPORTED_ALIGN
 struct SimpleAllocator {
     arena: UnsafeCell<[u8; ARENA_SIZE]>,
@@ -51,6 +53,6 @@ unsafe impl GlobalAlloc for SimpleAllocator {
         self.arena.get().cast::<u8>().add(allocated)
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        eprintln!("dealloc {:p}, size {}", ptr, layout.size())
+        log_dealloc(ptr, layout.size());
     }
 }

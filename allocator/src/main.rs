@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 mod alloc;
+mod logger;
 
 fn process_string(s: &str) -> String {
     match s.find(" ") {
