@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libc = "0.2.149"
+libc = "0.2.155"
 cvt = "0.1.2"
 ip_network = "0.4.1"
 ip_network_table = "0.2.0"
@@ -15,4 +15,4 @@ ip_network_table = "0.2.0"
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
-libp2p = { version = "0.40.0",  features = ["tcp-tokio"] }
+libp2p = { version = "0.40.0", features = ["tcp-tokio"] }
