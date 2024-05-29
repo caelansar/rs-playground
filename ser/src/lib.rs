@@ -1,5 +1,6 @@
 #![feature(test)]
 #![allow(dead_code)]
+#![feature(cow_is_borrowed)]
 
 mod byteorder;
 
@@ -151,16 +152,27 @@ mod tests {
     }
 
     #[bench]
-    fn bench_string_clone(b: &mut Bencher) {
+    fn bench_string_owned(b: &mut Bencher) {
         let data = [0u8; 102400];
-        let s = String::from_utf8_lossy(&data).into_owned();
-        b.iter(|| black_box(s.clone()))
+        b.iter(|| {
+            let s = String::from_utf8_lossy(&data);
+            black_box(s.into_owned());
+        })
+    }
+
+    #[bench]
+    fn bench_string_borrowed(b: &mut Bencher) {
+        let data = [0u8; 102400];
+        b.iter(|| {
+            let s = String::from_utf8_lossy(&data);
+            black_box(s.as_ref());
+        })
     }
 
     #[bench]
     fn bench_mem_take(b: &mut Bencher) {
         let data = [0u8; 102400];
         let mut s = String::from_utf8_lossy(&data).into_owned();
-        b.iter(|| black_box(std::mem::take(&mut s)))
+        b.iter(|| black_box(std::mem::take(&mut s)));
     }
 }
