@@ -1,4 +1,4 @@
-use crate::logger::log_dealloc;
+use crate::logger::{log_alloc, log_dealloc};
 use std::alloc::{GlobalAlloc, Layout};
 use std::cell::UnsafeCell;
 use std::ptr::null_mut;
@@ -44,7 +44,11 @@ unsafe impl GlobalAlloc for SimpleAllocator {
         {
             return null_mut();
         };
-        self.arena.get().cast::<u8>().add(allocated)
+
+        let ptr = self.arena.get().cast::<u8>().add(allocated);
+        log_alloc(ptr, layout.size());
+
+        ptr
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         log_dealloc(ptr, layout.size());
