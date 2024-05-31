@@ -57,6 +57,7 @@ async fn main() {
         );
 
     let listener = TcpListener::bind("127.0.0.1:5001").await.unwrap();
+    info!("Starting thumbor server on 127.0.0.1:5001");
 
     let server = serve(listener, app.into_make_service());
 
