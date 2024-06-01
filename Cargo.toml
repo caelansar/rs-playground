@@ -36,5 +36,6 @@ members = [
     "iter",
     "parser",
     "chat",
-    "bytes"
+    "bytes",
+    "shortener"
 ]
