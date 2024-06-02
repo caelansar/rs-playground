@@ -11,12 +11,11 @@ use http::{header::LOCATION, HeaderMap, StatusCode};
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
 use sqlx::pool::PoolOptions;
-use sqlx::postgres::PgDatabaseError;
 use sqlx::Error::Database;
 use sqlx::{FromRow, PgPool};
 use std::time::Duration;
 use tokio::net::TcpListener;
-use tracing::{debug, info, level_filters::LevelFilter, warn};
+use tracing::{debug, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt::Layer, layer::SubscriberExt, util::SubscriberInitExt, Layer as _};
 
 #[derive(Debug, Deserialize)]
@@ -69,11 +68,8 @@ async fn main() -> anyhow::Result<()> {
 async fn shorten(
     State(state): State<AppState>,
     Json(data): Json<ShortenReq>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let id = state.shorten(&data.url).await.map_err(|e| {
-        warn!("Failed to shorten URL: {e:?}");
-        StatusCode::UNPROCESSABLE_ENTITY
-    })?;
+) -> Result<impl IntoResponse, Error> {
+    let id = state.shorten(&data.url).await?;
 
     let body = Json(ShortenRes {
         url: format!("http://{LISTEN_ADDR}/{id}"),
@@ -84,11 +80,8 @@ async fn shorten(
 async fn redirect(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let url = state
-        .get_url(&id)
-        .await
-        .map_err(|_| StatusCode::NOT_FOUND)?;
+) -> Result<impl IntoResponse, Error> {
+    let url = state.get_url(&id).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(LOCATION, url.parse().unwrap());
