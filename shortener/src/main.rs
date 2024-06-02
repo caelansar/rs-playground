@@ -1,4 +1,6 @@
-use anyhow::Result;
+mod error;
+
+use crate::error::Error;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -8,7 +10,11 @@ use axum::{
 use http::{header::LOCATION, HeaderMap, StatusCode};
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
+use sqlx::pool::PoolOptions;
+use sqlx::postgres::PgDatabaseError;
+use sqlx::Error::Database;
 use sqlx::{FromRow, PgPool};
+use std::time::Duration;
 use tokio::net::TcpListener;
 use tracing::{debug, info, level_filters::LevelFilter, warn};
 use tracing_subscriber::{fmt::Layer, layer::SubscriberExt, util::SubscriberInitExt, Layer as _};
@@ -39,7 +45,7 @@ struct UrlRecord {
 const LISTEN_ADDR: &str = "127.0.0.1:5000";
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     let layer = Layer::new().with_filter(LevelFilter::DEBUG);
     tracing_subscriber::registry().with(layer).init();
 
@@ -65,9 +71,10 @@ async fn shorten(
     Json(data): Json<ShortenReq>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let id = state.shorten(&data.url).await.map_err(|e| {
-        warn!("Failed to shorten URL: {e}");
+        warn!("Failed to shorten URL: {e:?}");
         StatusCode::UNPROCESSABLE_ENTITY
     })?;
+
     let body = Json(ShortenRes {
         url: format!("http://{LISTEN_ADDR}/{id}"),
     });
@@ -89,8 +96,11 @@ async fn redirect(
 }
 
 impl AppState {
-    async fn try_new(url: &str) -> Result<Self> {
-        let pool = PgPool::connect(url).await?;
+    async fn try_new(url: &str) -> Result<Self, Error> {
+        let pool = PoolOptions::new();
+        let pool = pool.acquire_timeout(Duration::from_secs(5));
+
+        let pool = pool.connect(url).await?;
         // Create table if not exists
         sqlx::query(
             r#"
@@ -105,21 +115,27 @@ impl AppState {
         Ok(Self { db: pool })
     }
 
-    async fn shorten(&self, url: &str) -> Result<String> {
+    async fn shorten(&self, url: &str) -> Result<String, Error> {
         let id = nanoid!(6);
-        let ret: UrlRecord = sqlx::query_as(
+        let ret = sqlx::query_as::<_, UrlRecord>(
             "INSERT INTO urls (id, url) VALUES ($1, $2) ON CONFLICT(url) DO UPDATE SET url=EXCLUDED.url RETURNING id",
         )
             .bind(&id)
             .bind(url)
             .fetch_one(&self.db)
-            .await?;
+            .await;
 
-        debug!("insert record");
-        Ok(ret.id)
+        if let Err(Database(ref err)) = ret {
+            if err.code().is_some_and(|code| code == "23505") {
+                // TODO: stackoverflow
+                Box::pin(self.shorten(url)).await?;
+            }
+        }
+
+        Ok(ret?.id)
     }
 
-    async fn get_url(&self, id: &str) -> anyhow::Result<String> {
+    async fn get_url(&self, id: &str) -> Result<String, Error> {
         let ret: UrlRecord = sqlx::query_as("SELECT url FROM urls WHERE id = $1")
             .bind(id)
             .fetch_one(&self.db)
