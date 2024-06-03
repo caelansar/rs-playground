@@ -1,11 +1,12 @@
 use accept_header::Accept;
 use anyhow::Result;
+use axum::extract::State;
 use axum::{
     extract::Path,
     http::header::ACCEPT,
     http::{HeaderMap, HeaderValue, StatusCode},
     routing::get,
-    serve, Extension, Router,
+    serve, Router,
 };
 use bytes::Bytes;
 use image::ImageOutputFormat;
@@ -23,10 +24,11 @@ use std::{
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tower::ServiceBuilder;
-use tower_http::{add_extension::AddExtensionLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing::info;
 
 mod engine;
+mod helper;
 mod pb;
 
 use pb::*;
@@ -50,11 +52,8 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/image/:spec/:url", get(generate))
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(AddExtensionLayer::new(cache)),
-        );
+        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
+        .with_state(cache);
 
     let listener = TcpListener::bind("127.0.0.1:5001").await.unwrap();
     info!("Starting thumbor server on 127.0.0.1:5001");
@@ -67,7 +66,7 @@ async fn main() {
 }
 
 async fn root() -> &'static str {
-    "Pic"
+    "Thumbor Server"
 }
 
 struct OutputFormat(ImageOutputFormat);
@@ -109,7 +108,7 @@ fn get_format(headers: HeaderMap) -> OutputFormat {
 
 async fn generate(
     Path(Params { spec, url }): Path<Params>,
-    Extension(cache): Extension<Cache>,
+    State(cache): State<Cache>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Vec<u8>), StatusCode> {
     let url = percent_decode_str(&url).decode_utf8_lossy();
@@ -161,4 +160,24 @@ async fn retrieve_image(url: &str, cache: Cache) -> Result<Bytes> {
     };
     info!("get data success");
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::helper::TestClient;
+    use crate::root;
+    use axum::routing::get;
+    use axum::Router;
+    use http::StatusCode;
+
+    #[tokio::test]
+    async fn handler_into_service() {
+        let app = Router::new().route("/", get(root));
+
+        let client = TestClient::new(app);
+
+        let res = client.get("/").await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.text().await, "Thumbor Server");
+    }
 }
