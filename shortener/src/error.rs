@@ -5,15 +5,15 @@ use http::StatusCode;
 pub enum Error {
     #[error("database error")]
     SqlxError(#[from] sqlx::error::Error),
+    #[error("url not found")]
+    UrlNotFound,
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
-            Error::SqlxError(sqlx::error::Error::RowNotFound) => {
-                StatusCode::NOT_FOUND.into_response()
-            }
-            _ => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
+            Error::UrlNotFound => StatusCode::NOT_FOUND.into_response(),
+            Error::SqlxError(_) => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
         }
     }
 }

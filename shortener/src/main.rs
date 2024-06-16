@@ -129,12 +129,16 @@ impl AppState {
     }
 
     async fn get_url(&self, id: &str) -> Result<String, Error> {
-        let ret: UrlRecord = sqlx::query_as("SELECT url FROM urls WHERE id = $1")
+        let ret: Option<UrlRecord> = sqlx::query_as("SELECT url FROM urls WHERE id = $1")
             .bind(id)
-            .fetch_one(&self.db)
+            .fetch_optional(&self.db)
             .await?;
 
+        if ret.is_none() {
+            return Err(Error::UrlNotFound);
+        }
+
         debug!("get record, id: {id}");
-        Ok(ret.url)
+        Ok(ret.unwrap().url)
     }
 }
