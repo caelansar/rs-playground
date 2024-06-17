@@ -10,6 +10,7 @@ mod async_iter;
 mod async_trait;
 mod cancel_decorator;
 mod delay;
+mod future_stream;
 mod line_stream;
 mod proxy;
 mod recursion;
