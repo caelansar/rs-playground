@@ -1,6 +1,7 @@
 mod error;
 
 use crate::error::Error;
+use axum::extract::FromRef;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -33,6 +34,12 @@ struct AppState {
     db: PgPool,
 }
 
+impl FromRef<AppState> for PgPool {
+    fn from_ref(input: &AppState) -> Self {
+        todo!()
+    }
+}
+
 #[derive(Debug, FromRow)]
 struct UrlRecord {
     #[sqlx(default)]
@@ -58,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", post(shorten))
         .route("/:id", get(redirect))
+        .route("/test", get(no_op))
         .with_state(state);
 
     axum::serve(listener, app.into_make_service()).await?;
@@ -86,6 +94,10 @@ async fn redirect(
     let mut headers = HeaderMap::new();
     headers.insert(LOCATION, url.parse().unwrap());
     Ok((StatusCode::PERMANENT_REDIRECT, headers))
+}
+
+async fn no_op(State(_): State<PgPool>) -> impl IntoResponse {
+    "ok"
 }
 
 impl AppState {
