@@ -1,13 +1,14 @@
 #![feature(impl_trait_in_assoc_type)]
 
-use futures::future::BoxFuture;
+mod concurrency;
+mod future;
+mod timeout;
+
 use pin_project::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
-use tokio::time::{sleep, Sleep};
-use tower::Service;
+use tokio::time::Sleep;
 
 #[pin_project]
 pub struct ResponseFuture<F> {
@@ -42,92 +43,14 @@ impl<F: Future> Future for ResponseFuture<F> {
     }
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-struct Timeout<S> {
-    inner: S,
-    timeout: Duration,
-}
-
-impl<S> Timeout<S> {
-    #[allow(dead_code)]
-    pub fn new(inner: S, timeout: Duration) -> Self {
-        Timeout { inner, timeout }
-    }
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-struct Timeout2<S> {
-    inner: S,
-    timeout: Duration,
-}
-
-impl<S> Timeout2<S> {
-    #[allow(dead_code)]
-    pub fn new(inner: S, timeout: Duration) -> Self {
-        Timeout2 { inner, timeout }
-    }
-}
-
-impl<S, Request> Service<Request> for Timeout<S>
-where
-    S: Service<Request>,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = ResponseFuture<S::Future>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Request) -> Self::Future {
-        let response_future = self.inner.call(req);
-
-        let sleep = sleep(self.timeout);
-
-        ResponseFuture {
-            response_future,
-            sleep,
-        }
-    }
-}
-
-impl<S, Request> Service<Request> for Timeout2<S>
-where
-    S: Service<Request> + Send + 'static,
-    S::Future: Send + 'static,
-    S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    type Response = S::Response;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
-    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(|e| e.into())
-    }
-
-    fn call(&mut self, req: Request) -> Self::Future {
-        let fut = self.inner.call(req);
-        let timeout = self.timeout;
-
-        async move {
-            match tokio::time::timeout(timeout, fut).await {
-                Ok(Ok(res)) => Ok(res),
-                Ok(Err(e)) => Err(e.into()),
-                Err(e) => {
-                    println!("tokio timeout");
-                    Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-                }
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::concurrency::ConcurrencyLimit;
+    use crate::timeout::{Timeout, Timeout2};
+    use std::time::Duration;
+    use tokio::time::sleep;
+    use tower::{Service, ServiceExt};
 
     struct TestService;
 
@@ -176,5 +99,36 @@ mod tests {
 
         let data = timeout_svc.call(()).await.unwrap();
         assert_eq!(1, data);
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_concurrency_failed() {
+        let svc = TestService;
+
+        let mut concurrency_svc = ConcurrencyLimit::new(svc, 2);
+
+        for _ in 0..3 {
+            let data = concurrency_svc.call(()).await.unwrap();
+            assert_eq!(1, data);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_concurrency_permitted() {
+        let svc = TestService;
+
+        let mut concurrency_svc = ConcurrencyLimit::new(svc, 2);
+
+        for _ in 0..3 {
+            let data = concurrency_svc
+                .ready()
+                .await
+                .unwrap()
+                .call(())
+                .await
+                .unwrap();
+            assert_eq!(1, data);
+        }
     }
 }

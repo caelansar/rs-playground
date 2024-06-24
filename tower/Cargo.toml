@@ -10,4 +10,4 @@ futures = { workspace = true }
 anyhow = { workspace = true }
 tokio-stream = { workspace = true }
 pin-project = { workspace = true }
-tower = { workspace = true }
+tower = { workspace = true, features = ["util"] }
