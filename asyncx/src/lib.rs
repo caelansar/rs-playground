@@ -12,6 +12,7 @@ mod cancel_decorator;
 mod delay;
 mod future_stream;
 mod line_stream;
+mod poll_fn;
 mod proxy;
 mod recursion;
 mod rt;
