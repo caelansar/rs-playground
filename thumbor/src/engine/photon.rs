@@ -3,19 +3,17 @@ use crate::pb::*;
 use anyhow::Result;
 use bytes::Bytes;
 use image::{DynamicImage, ImageBuffer, ImageOutputFormat};
-use lazy_static::lazy_static;
 use photon_rs::filters;
 use photon_rs::{multiple, native::open_image_from_bytes, transform, PhotonImage};
 use std::io::Cursor;
 use std::ops::{Deref, DerefMut};
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref WATERMARK: PhotonImage = {
-        let data = include_bytes!("../../gopher.png");
-        let watermark = open_image_from_bytes(data).unwrap();
-        transform::resize(&watermark, 64, 64, transform::SamplingFilter::Nearest)
-    };
-}
+static WATERMARK: LazyLock<PhotonImage> = LazyLock::new(|| {
+    let data = include_bytes!("../../gopher.png");
+    let watermark = open_image_from_bytes(data).unwrap();
+    transform::resize(&watermark, 64, 64, transform::SamplingFilter::Nearest)
+});
 
 pub struct Photon(PhotonImage);
 

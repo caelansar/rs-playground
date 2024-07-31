@@ -1,3 +1,5 @@
+#![feature(lazy_cell)]
+
 use accept_header::Accept;
 use anyhow::Result;
 use axum::extract::State;
