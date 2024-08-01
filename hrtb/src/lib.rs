@@ -117,9 +117,40 @@ fn do_it(data: &(u8, u16)) -> &u8 {
     &data.0
 }
 
+fn get_closure<'a>() -> impl Fn(&'a str) {
+    |s| println!("do something for foo")
+}
+
+fn get_closure1() -> impl for<'a> Fn(&'a str) {
+    |s| println!("do something for foo")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // #[test]
+    // fn test_get_closure() {
+    //     let f = get_closure();
+    //     let s = String::from("ab");
+    //
+    //     f(&s); // borrowed value does not live long enough
+    // }
+    #[test]
+    fn test_get_closure() {
+        let s = String::from("ab");
+        let f = get_closure();
+
+        f(&s); // borrowed value does not live long enough
+    }
+
+    #[test]
+    fn test_get_closure1() {
+        let f = get_closure1();
+        let s = String::from("ab");
+
+        f(&s); // borrowed value does not live long enough
+    }
 
     #[test]
     fn vec_filter_should_work() {
