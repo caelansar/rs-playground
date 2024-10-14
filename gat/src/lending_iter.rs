@@ -23,7 +23,10 @@ impl<'t, T> WindowsMut<'t, T> {
 }
 
 impl<'t, T> LendingIterator for WindowsMut<'t, T> {
-    type Item<'a> = &'a mut [T] where Self: 'a;
+    type Item<'a>
+        = &'a mut [T]
+    where
+        Self: 'a;
 
     fn next(&mut self) -> Option<Self::Item<'_>> {
         let retval = self.slice[self.start..].get_mut(..self.window_size)?;

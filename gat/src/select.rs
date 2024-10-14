@@ -8,7 +8,8 @@ pub trait Select<T> {
 }
 
 impl<T> Select<T> for usize {
-    type Output<'a> = &'a T
+    type Output<'a>
+        = &'a T
     where
         T: 'a,
         Self: 'a;
@@ -19,7 +20,8 @@ impl<T> Select<T> for usize {
 }
 
 impl<T> Select<T> for &[usize] {
-    type Output<'a> = impl Iterator<Item = &'a T>
+    type Output<'a>
+        = impl Iterator<Item = &'a T>
     where
         T: 'a,
         Self: 'a;
@@ -30,7 +32,8 @@ impl<T> Select<T> for &[usize] {
 }
 
 impl<T, const N: usize> Select<T> for [usize; N] {
-    type Output<'a> = impl Iterator<Item = &'a T>
+    type Output<'a>
+        = impl Iterator<Item = &'a T>
     where
         T: 'a,
         Self: 'a;

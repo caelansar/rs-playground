@@ -56,7 +56,10 @@ impl<Cx> Service<Cx, Request<Body>> for HelloWorld {
 
     type Error = http::Error;
 
-    type Future<'cx> = impl Future<Output = Result<Self::Response, Self::Error>> + 'cx where Cx: 'cx;
+    type Future<'cx>
+        = impl Future<Output = Result<Self::Response, Self::Error>> + 'cx
+    where
+        Cx: 'cx;
 
     fn call<'cx, 's>(&'s self, _cx: &'cx mut Cx, _req: Request<Body>) -> Self::Future<'cx>
     where

@@ -17,7 +17,10 @@ impl<'a> StrRefHolder<'a> {
 }
 
 impl<'s> RefIterator for StrRefHolder<'s> {
-    type Item<'a> = &'a str where 's: 'a;
+    type Item<'a>
+        = &'a str
+    where
+        's: 'a;
 
     fn next(&mut self) -> Option<Self::Item<'_>> {
         if self.i >= self.strings.len() {
